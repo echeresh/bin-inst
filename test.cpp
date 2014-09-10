@@ -71,7 +71,7 @@ void mul3(int n, double* a, double* b, double* c)
 typedef void (*mul)(int, double*, double*, double*);
 
 template <class Func>
-void test(Func func, int n, double* a, double* b, double* c)
+void test(Func func, int n, double a[], double b[], double c[])
 {
     double t0 = dsecnd();
     func(n, a, b, c);
@@ -96,9 +96,12 @@ int main(int argc, char** argv)
     const int n = 32;
     const int mix = stoi(argv[1]);
     mul mfuncs[4] = { &mul0, &mul1, &mul2, &mul3};
-    double a[n*n];
-    double b[n*n];
-    double c[n*n] = { 0 };
+    //double a[n*n];
+    //double b[n*n];
+    //double c[n*n] = { 0 };
+    double* a = (double*)malloc(sizeof(double)*n*n);
+    double* b = (double*)malloc(sizeof(double)*n*n);
+    double* c = (double*)calloc(n*n, sizeof(double));
     for (int i = 0; i < n; i++)
         for (int j = 0; j < n; j++)
         {

@@ -19,19 +19,19 @@ struct RoutineInfo
 
 struct FuncCall
 {
-    const FuncInfo* funcInfo;
+    const dbg::FuncInfo* funcInfo;
     void* frameBase;
     
-    FuncCall(const FuncInfo* funcInfo, void* frameBase);
+    FuncCall(const dbg::FuncInfo* funcInfo, void* frameBase);
 };
 
 struct MemoryObject
 {
     void* addr;
     size_t size;
-    const VarInfo* varInfo;
+    const dbg::VarInfo* varInfo;
     
-    MemoryObject(void* addr = nullptr, size_t size = 0, const VarInfo* varInfo = nullptr);
+    MemoryObject(void* addr = nullptr, size_t size = 0, const dbg::VarInfo* varInfo = nullptr);
     string name() const;
     void* lo() const;
     void* hi() const;
@@ -42,6 +42,7 @@ struct MemoryObject
 struct CallStack
 {
     std::vector<FuncCall> calls;
+    ADDRINT lastCallInstruction = 0;
     
     void addCall(const FuncCall& call);
     MemoryObject findObject(void* addr, size_t size);
@@ -56,7 +57,7 @@ class HeapInfo
     std::set<MemoryObject> objects;
 
 public:
-    void handleAlloc(void* addr, size_t size);
+    void handleAlloc(void* addr, size_t size, const std::string& varName);
     void handleFree(void* addr);
     MemoryObject findObject(void* addr, size_t size) const;
 };
@@ -83,24 +84,24 @@ struct Access
 
 class ExecHandler
 {
+public:
     static const int MaxThreads = 64;
 
+    std::string binPath;
     std::map<int, RoutineInfo> routines;
     PIN_LOCK lock;
     std::vector<CallStack> callStacks;
-    const DebugContext& dbgCtxt;
-    MemoryObject currentHeapAlloc;
+    const dbg::DebugContext& dbgCtxt;
     HeapInfo heapInfo;
     std::set<Access> accesses;
     
     MemoryObject findNonStackObject(void* addr, size_t size);
     MemoryObject findStackObject(void* addr, size_t size);
+    std::string getVarNameFromFile(const std::string& filePath, int line) const;
 
 public:
-    ExecHandler(const DebugContext& dbgCtxt);
+    ExecHandler(const std::string& binPath, const dbg::DebugContext& dbgCtxt);
     int getRoutineId(RTN rtn);
-    void handleHeapAllocBefore(THREADID threadId, size_t size);
-    void handleHeapAllocAfter(THREADID threadId, void* addr);
     void handleHeapAlloc(THREADID threadId, void* addr, size_t size);
     void handleHeapFree(THREADID threadId, void* addr);
     void handleRoutineEnter(CONTEXT* ctxt, THREADID threadId, int routineId);
@@ -108,7 +109,13 @@ public:
     void handleMemoryRead(THREADID threadId, void* addr, size_t size);    
     void handleMemoryWrite(THREADID threadId, void* addr, size_t size);
     MemoryObject findObject(void* addr, int size);
-    void analyseRoutine(RTN rtn);
-    void analyseInstruction(INS ins);
+    
+    void instrumentImageLoad(IMG img);
+    void instrumentRoutine(RTN rtn);
+    void instrumentTrace(TRACE trace);
+    void instrumentInstruction(INS ins);
+    
+    void instrumentRoutineExternal(RTN rtn);
     void saveMemoryAccesses() const;
+    void setLastCallInstruction(ADDRINT instAddr, THREADID threadId);
 };

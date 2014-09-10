@@ -1,6 +1,6 @@
 var_desc=system("echo $VAR_DESC")
 
-set terminal png size 4000,2000
+set terminal png size 16000,8000
 set output 'out.png'
 set border linewidth 0.5
 set grid

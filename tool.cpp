@@ -10,25 +10,29 @@
 #include "pin.H"
 #include "dwarfparser.h"
 #include "exechandler.h"
+#include "debuginfo.h"
 
 ExecHandler* execHandler;
-DwarfParser* parser;
+dwarf::Parser* parser;
  
-VOID Instruction(INS ins, VOID *v)
-{
-    execHandler->analyseInstruction(ins);
-}
+// VOID Instruction(INS ins, VOID *v)
+// {
+    // execHandler->instrumentInstruction(ins);
+// }
+
+// VOID Trace(TRACE trace, VOID *v)
+// {
+    // execHandler->instrumentTrace(trace);
+// }
 
 VOID ImageLoad(IMG img, VOID* v)
-{    
-    for (SEC sec = IMG_SecHead(img); SEC_Valid(sec); sec = SEC_Next(sec))
-        for (RTN rtn = SEC_RtnHead(sec); RTN_Valid(rtn); rtn = RTN_Next(rtn))
-            execHandler->analyseRoutine(rtn);
+{
+    execHandler->instrumentImageLoad(img);
 }
 
 VOID ThreadStart(THREADID threadId, CONTEXT *ctxt, INT32 flags, VOID *v)
 {
-    ADDRINT stackBase = PIN_GetContextReg(ctxt, REG_STACK_PTR);
+    //ADDRINT stackBase = PIN_GetContextReg(ctxt, REG_STACK_PTR);
     struct rlimit rlim;
     if (getrlimit(RLIMIT_STACK, &rlim))
     {
@@ -42,8 +46,8 @@ VOID ThreadStart(THREADID threadId, CONTEXT *ctxt, INT32 flags, VOID *v)
         PIN_ExitProcess(-1);
     }
 
-    void* stackEnd = (void*)(stackBase - rlim.rlim_cur);
-    cout << "stack end : " << stackEnd << endl;
+    //void* stackEnd = (void*)(stackBase - rlim.rlim_cur);
+    //cout << "stack end : " << stackEnd << endl;
     // MemoryAllocation ma;
     // ma.lo = (void*)stackEnd;
     // ma.hi = (void*)stackBase;
@@ -78,19 +82,34 @@ VOID Fini(INT32 code, VOID *v)
     delete execHandler;
 }
 
+dbg::DebugContext dbgCtxt;
+
 int main(int argc, char* argv[])
 {
-    //parser = new DwarfParser(argv[argc - 1]);
-    parser = new DwarfParser("test");
-    parser->cuWalk(bind(&DwarfParser::walk, parser, placeholders::_1, placeholders::_2));
-    execHandler = new ExecHandler(parser->getDebugContext());
+    string binPath;
+    for (int i = 0; i < argc; i++)
+        if (string(argv[i]) == "--")
+        {
+            assert(i < argc - 1);
+            char buf[PATH_MAX];
+            assert(realpath(argv[i + 1], buf));
+            binPath = string(buf);            
+        }
+
+    parser = new dwarf::Parser(binPath);
+    parser->cuWalk(bind(&dwarf::Parser::walk, parser, placeholders::_1, placeholders::_2));
+    dbgCtxt = parser->getDebugContext().toDbg();
+    
+    execHandler = new ExecHandler(binPath, dbgCtxt);
     PIN_InitSymbols();
     if (PIN_Init(argc, argv))
         return -1;
 
+    cout << "======= PIN" << endl;
     PIN_AddThreadStartFunction(ThreadStart, 0);
     PIN_AddThreadFiniFunction(ThreadFini, 0);
-    INS_AddInstrumentFunction(Instruction, 0);
+    //INS_AddInstrumentFunction(Instruction, 0);
+    //TRACE_AddInstrumentFunction(Trace, 0);
     IMG_AddInstrumentFunction(ImageLoad, 0);
     PIN_AddFiniFunction(Fini, 0);
     PIN_StartProgram();

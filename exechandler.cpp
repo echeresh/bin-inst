@@ -9,19 +9,31 @@ inline uint64_t rdtsc()
     return x;
 }
 
+//------------------------------------------------------------------------------
+//RoutineInfo
+//------------------------------------------------------------------------------
+
 RoutineInfo::RoutineInfo(int id, const std::string& name) :
     id(id),
     name(name)
 {
 }
 
-FuncCall::FuncCall(const FuncInfo* funcInfo, void* frameBase) :
+//------------------------------------------------------------------------------
+//FuncCall
+//------------------------------------------------------------------------------
+
+FuncCall::FuncCall(const dbg::FuncInfo* funcInfo, void* frameBase) :
     funcInfo(funcInfo),
     frameBase(frameBase)
 {
 }
 
-MemoryObject::MemoryObject(void* addr, size_t size, const VarInfo* varInfo) :
+//------------------------------------------------------------------------------
+//MemoryObject
+//------------------------------------------------------------------------------
+
+MemoryObject::MemoryObject(void* addr, size_t size, const dbg::VarInfo* varInfo) :
     addr(addr),
     size(size),
     varInfo(varInfo)
@@ -75,11 +87,7 @@ MemoryObject CallStack::findObject(void* addr, size_t size)
         {
             for (auto& var : call.funcInfo->vars)
             {
-               
-                if (var->location.entries.empty())
-                    continue;
-                assert(var->location.entries.front().reg == LocSource::FrameBase);
-                char* varAddr = (char*)call.frameBase + var->location.entries.front().off;
+                char* varAddr = (char*)call.frameBase + var->loc;
                 if (varAddr <= addr && addr <= varAddr + var->size - 1)
                 {
                     //cout << "found object: " << var->name << endl;
@@ -142,30 +150,71 @@ static void routineExit(ExecHandler* execHandler, CONTEXT* ctxt, THREADID thread
     execHandler->handleRoutineExit(ctxt, threadId, rtnId);
 }
 
-static void heapAllocBefore(ExecHandler* execHandler, THREADID threadId, size_t size)
+static void routineCall2Before(ExecHandler* execHandler, THREADID threadId, ADDRINT instAddr, UINT32 rtnId)
 {
-    execHandler->handleHeapAllocBefore(threadId, size);
+    //cout << "routineCall2Before " << execHandler->routines[rtnId].name << endl;
+    execHandler->setLastCallInstruction(instAddr, threadId);
 }
 
-static void heapAllocAfter(ExecHandler* execHandler, THREADID threadId, void* addr)
+static void routineCall2After(ExecHandler* execHandler, THREADID threadId, ADDRINT instAddr, UINT32 rtnId)
 {
-    execHandler->handleHeapAllocAfter(threadId, addr);
+    //cout << "routineCall2After: " << execHandler->routines[rtnId].name << endl;
 }
 
-static void heapFree(ExecHandler* execHandler, THREADID threadId, void* addr)
+namespace mem
 {
-    execHandler->handleHeapFree(threadId, addr);
-}
+    PIN_LOCK lock;
+    
+    //not thread safe
+    size_t mallocSizeRequested;
+    size_t callocSizeRequested;
+    
+    static void mallocBefore(ExecHandler* execHandler, THREADID threadId, size_t size)
+    {
+        Locker locker(&lock, threadId);
+        mallocSizeRequested = size;
+    }
 
-static void memoryRead(ExecHandler* execHandler, VOID* ip, THREADID threadId, VOID* addr, UINT32 size)
-{
-    execHandler->handleMemoryRead(threadId, addr, size);
-}
+    static void mallocAfter(ExecHandler* execHandler, THREADID threadId, void* addr)
+    {
+        Locker locker(&lock, threadId);
+        if (!addr || mallocSizeRequested == 0)
+            return;
+        execHandler->handleHeapAlloc(threadId, addr, mallocSizeRequested);
+        mallocSizeRequested = 0;
+    }
+    
+    static void callocBefore(ExecHandler* execHandler, THREADID threadId, size_t nmemb, size_t size)
+    {
+        Locker locker(&lock, threadId);
+        callocSizeRequested = nmemb*size;
+    }
 
-static void memoryWrite(ExecHandler* execHandler, VOID* ip, THREADID threadId, VOID* addr, UINT32 size)
-{
-    execHandler->handleMemoryWrite(threadId, addr, size);
-}
+    static void callocAfter(ExecHandler* execHandler, THREADID threadId, void* addr)
+    {
+        Locker locker(&lock, threadId);
+        if (!addr || callocSizeRequested == 0)
+            return;
+        execHandler->handleHeapAlloc(threadId, addr, callocSizeRequested);
+        callocSizeRequested = 0;
+    }
+
+    static void freeBefore(ExecHandler* execHandler, THREADID threadId, void* addr)
+    {
+        execHandler->handleHeapFree(threadId, addr);
+    }
+
+    static void memoryRead(ExecHandler* execHandler, VOID* ip, THREADID threadId, VOID* addr, UINT32 size)
+    {
+        execHandler->handleMemoryRead(threadId, addr, size);
+    }
+
+    static void memoryWrite(ExecHandler* execHandler, VOID* ip, THREADID threadId, VOID* addr, UINT32 size)
+    {
+        execHandler->handleMemoryWrite(threadId, addr, size);
+    }
+};
+
 
 template <class Cont, class TKey>
 typename Cont::iterator lessFirst(Cont& c, const TKey& key)
@@ -183,23 +232,32 @@ typename Cont::iterator lessFirst(Cont& c, const TKey& key)
 //HeapInfo
 //------------------------------------------------------------------------------
 
-void HeapInfo::handleAlloc(void* addr, size_t size)
+void HeapInfo::handleAlloc(void* addr, size_t size, const std::string& varName)
 {
-    auto ret = objects.insert(MemoryObject(addr, size));
+    static int id = 0;
+    auto* varInfo = new dbg::VarInfo(dbg::StorageType::Dynamic,
+                                     varName + "#" + to_string(id++), 
+                                     size, (ssize_t)addr);
+    auto ret = objects.insert(MemoryObject(addr, size, varInfo));
     if (!ret.second)
     {
         //cout << "heap-error: " << addr << " " << size << endl;
     }
+    cout << "alloc: " << size << endl;
 }
 
 void HeapInfo::handleFree(void* addr)
 {
-    auto nErased = objects.erase(MemoryObject(addr));
-    assert(nErased >= 0);
+    auto it = objects.find(MemoryObject(addr));
+    if (it == objects.end())
+        return;
+    delete it->varInfo;
+    objects.erase(it);
 }
 
 MemoryObject HeapInfo::findObject(void* addr, size_t size) const
 {
+    //cout << "heap " << objects.size() << endl;
     auto it = lessFirst(objects, addr);
     if (it == objects.end())
         return MemoryObject();
@@ -217,7 +275,7 @@ MemoryObject HeapInfo::findObject(void* addr, size_t size) const
 //------------------------------------------------------------------------------
 
 Access::Access(void* addr, size_t size, uint64_t cycles, THREADID threadId,
-       AccessType type, const MemoryObject& memoryObject) :
+               AccessType type, const MemoryObject& memoryObject) :
     addr(addr),
     size(size),
     cycles(cycles),
@@ -238,18 +296,61 @@ bool Access::operator<(const Access& a) const
 
 MemoryObject ExecHandler::findNonStackObject(void* addr, size_t size)
 {
-    return MemoryObject();
+    return heapInfo.findObject(addr, size);
 }
 
 MemoryObject ExecHandler::findStackObject(void* addr, size_t size)
 {
-    return callStacks[0].findObject(addr, size);
+    for (int i = 0; i < callStacks.size(); i++)
+    {
+        auto mo = callStacks[0].findObject(addr, size);
+        if (!mo.isEmpty())
+            return mo;
+    }
+    return MemoryObject();
 }
 
-ExecHandler::ExecHandler(const DebugContext& dbgCtxt) :
+string ExecHandler::getVarNameFromFile(const string& filePath, int lineNumber) const
+{
+    //optimize: preload all files before analysis
+    if (lineNumber == 0 || filePath.empty())
+        return "";
+    ifstream in(filePath);
+    string line;
+    for (int i = 0; i < lineNumber; i++)
+    {
+        getline(in, line);
+        if (in.eof())
+            return "";
+    }
+    if (line.find("alloc") == string::npos)
+        return "";
+    auto pos = line.find("=");
+    assert(pos != string::npos);
+    
+    pos--;
+    while (isspace(line[pos]))
+        pos--;
+        
+    string var;
+    for (int i = pos; i >= 0; i--)
+    {
+        char c = line[i];
+        if (!isalnum(c) && c != '_')
+            break;
+        var = line[i] + var ;
+    }
+    assert(!var.empty());
+    cout << "var: " << var << endl;
+    return var;
+}
+
+ExecHandler::ExecHandler(const string& binPath, const dbg::DebugContext& dbgCtxt) :
+    binPath(binPath),
     callStacks(MaxThreads),
     dbgCtxt(dbgCtxt)
 {
+    PIN_InitLock(&lock);
 }
 
 int ExecHandler::getRoutineId(RTN rtn)
@@ -260,21 +361,19 @@ int ExecHandler::getRoutineId(RTN rtn)
     return id;
 }
 
-void ExecHandler::handleHeapAllocBefore(THREADID threadId, size_t size)
-{
-    Locker locker(&lock, threadId);
-    currentHeapAlloc.size = size;
-}
-
-void ExecHandler::handleHeapAllocAfter(THREADID threadId, void* addr)
-{
-    Locker locker(&lock, threadId);
-    handleHeapAlloc(threadId, addr, currentHeapAlloc.size);
-}
-
 void ExecHandler::handleHeapAlloc(THREADID threadId, void* addr, size_t size)
 {
-    heapInfo.handleAlloc(addr, size);
+    ADDRINT instAddr = callStacks[threadId].lastCallInstruction;
+    
+    int column;
+    int line;
+    string fileName;
+    PIN_LockClient();
+    PIN_GetSourceLocation(instAddr, &column, &line, &fileName);
+    PIN_UnlockClient();
+    //cout << "malloc before: " << column << " " << line << " " << fileName << endl;
+    string name = getVarNameFromFile(fileName, line);
+    heapInfo.handleAlloc(addr, size, name);
 }
 
 void ExecHandler::handleHeapFree(THREADID threadId, void* addr)
@@ -288,17 +387,15 @@ void ExecHandler::handleRoutineEnter(CONTEXT* ctxt, THREADID threadId, int routi
     Locker locker(&lock, threadId);
     auto& rtnInfo = routines[routineId];
     auto* funcInfo = dbgCtxt.findFuncByName(rtnInfo.name);
-    //cout << "call " << rtnInfo.name << " " << rdtsc() << endl;
-    if (!funcInfo || funcInfo->location.entries.empty())
+    if (!funcInfo)
         return;
-
-    // cout << endl << "call stack: " << endl;
+    
+    cout << "call " << rtnInfo.name << endl;
+    //cout << endl << "call stack: " << endl;
     // cout << callStacks[threadId].str() << endl;
     // cout << endl;
     // cout << "frame base is known: " << rtnInfo.name << endl;
-    auto& loc = funcInfo->location.entries.front();
-    assert(loc.reg == LocSource::RSP);
-    void* frameBase = (char*)PIN_GetContextReg(ctxt, REG_STACK_PTR) + loc.off;
+    void* frameBase = (char*)PIN_GetContextReg(ctxt, REG_STACK_PTR) + funcInfo->loc;
     callStacks[threadId].addCall(FuncCall(funcInfo, frameBase));
 }
 
@@ -307,17 +404,10 @@ void ExecHandler::handleRoutineExit(CONTEXT* ctxt, THREADID threadId, int routin
     Locker locker(&lock, threadId);
     auto& rtnInfo = routines[routineId];
     auto* funcInfo = dbgCtxt.findFuncByName(rtnInfo.name);
-    //cout << "exit " << rtnInfo.name << endl;
     if (!funcInfo)
-    {
-        //cout << "not found: " << rtnInfo.name << endl;
         return;
-    }
-    if (funcInfo->location.entries.empty())
-    {
-        //cout << "frame base is unknown: " << rtnInfo.name << endl;
-        return;
-    }
+    
+    cout << "exit " << rtnInfo.name << endl;
     // cout << endl << "call stack: " << endl;
     // cout << callStacks[threadId].str() << endl;
     // cout << endl;
@@ -350,38 +440,22 @@ MemoryObject ExecHandler::findObject(void* addr, int size)
     return mo;
 }
 
-void ExecHandler::analyseRoutine(RTN rtn)
-{   
-    RTN_Open(rtn);
+void ExecHandler::instrumentRoutine(RTN rtn)
+{
     int id = getRoutineId(rtn);
+    //string name = RTN_Name(rtn);
     RTN_InsertCall(rtn, IPOINT_BEFORE, (AFUNPTR)routineEnter,
                    IARG_PTR, this, IARG_CONTEXT,
                    IARG_THREAD_ID, IARG_UINT32, id, IARG_END);
     RTN_InsertCall(rtn, IPOINT_AFTER, (AFUNPTR)routineExit,
                    IARG_PTR, this, IARG_CONTEXT,
                    IARG_THREAD_ID, IARG_UINT32, id, IARG_END);
-    string name = RTN_Name(rtn);
-    if (name == "malloc" || name == "__libc_malloc")
-    {
-        RTN_InsertCall(rtn, IPOINT_BEFORE, (AFUNPTR)heapAllocBefore,
-                   IARG_PTR, this, IARG_THREAD_ID,
-                   IARG_FUNCARG_ENTRYPOINT_VALUE, 0, IARG_END);
-        RTN_InsertCall(rtn, IPOINT_AFTER, (AFUNPTR)heapAllocAfter,
-                   IARG_PTR, this, IARG_THREAD_ID,
-                   IARG_FUNCRET_EXITPOINT_VALUE, IARG_END);
-    }
-    else if (name == "free" || name == "__libc_free")
-    {
-        RTN_InsertCall(rtn, IPOINT_BEFORE, (AFUNPTR)heapFree,
-                   IARG_PTR, this, IARG_THREAD_ID,
-                   IARG_FUNCARG_ENTRYPOINT_VALUE, 0, IARG_END);
-    }
-    RTN_Close(rtn);
 }
 
-void ExecHandler::analyseInstruction(INS ins)
+void ExecHandler::instrumentInstruction(INS ins)
 {
     UINT32 memOperands = INS_MemoryOperandCount(ins);
+    
     for (UINT32 memOp = 0; memOp < memOperands; memOp++)
     {
         bool f = false;
@@ -390,7 +464,7 @@ void ExecHandler::analyseInstruction(INS ins)
             f = true;
             auto size = INS_MemoryOperandSize(ins, memOp);
             INS_InsertPredicatedCall(
-                ins, IPOINT_BEFORE, (AFUNPTR)memoryRead,
+                ins, IPOINT_BEFORE, (AFUNPTR)mem::memoryRead,
                 IARG_PTR, this, IARG_INST_PTR,
                 IARG_THREAD_ID,
                 IARG_MEMORYOP_EA, memOp,
@@ -402,7 +476,7 @@ void ExecHandler::analyseInstruction(INS ins)
             f = true;
             auto size = INS_MemoryOperandSize(ins, memOp);
             INS_InsertPredicatedCall(
-                ins, IPOINT_BEFORE, (AFUNPTR)memoryWrite,
+                ins, IPOINT_BEFORE, (AFUNPTR)mem::memoryWrite,
                 IARG_PTR, this, IARG_INST_PTR,
                 IARG_THREAD_ID,
                 IARG_MEMORYOP_EA, memOp,
@@ -410,6 +484,85 @@ void ExecHandler::analyseInstruction(INS ins)
                 IARG_END);
         }
         assert(f);
+    }
+    //benchmark for separate function calls
+    if (INS_IsCall(ins) && INS_IsDirectBranchOrCall(ins))
+    {
+        INS next = INS_Next(ins);
+        if (!INS_Valid(next))
+            return;
+        ADDRINT target = INS_DirectBranchOrCallTargetAddress(ins);
+        RTN rtn = RTN_FindByAddress(target);
+        if (!RTN_Valid(rtn))
+            return;
+        //skip .plt
+        if (RTN_Name(rtn) == ".plt")
+            return;
+        int id = getRoutineId(rtn);
+        
+        INS_InsertPredicatedCall(
+                ins, IPOINT_BEFORE, (AFUNPTR)routineCall2Before,
+                IARG_PTR, this,
+                IARG_THREAD_ID, IARG_INST_PTR,
+                IARG_UINT32, id,
+                IARG_END);
+        INS_InsertPredicatedCall(
+                next, IPOINT_BEFORE, (AFUNPTR)routineCall2After,
+                IARG_PTR, this,
+                IARG_THREAD_ID, IARG_INST_PTR,
+                IARG_UINT32, id,
+                IARG_END);
+    }
+    //cout << INS_Disassemble(ins) << endl;
+}
+
+void ExecHandler::instrumentImageLoad(IMG img)
+{
+    bool external = IMG_Name(img) != binPath;
+    for (SEC sec = IMG_SecHead(img); SEC_Valid(sec); sec = SEC_Next(sec))
+        for (RTN rtn = SEC_RtnHead(sec); RTN_Valid(rtn); rtn = RTN_Next(rtn))
+        {
+            RTN_Open(rtn);
+            if (external)
+                instrumentRoutineExternal(rtn);
+            else
+            {
+                instrumentRoutine(rtn);
+                for (INS ins = RTN_InsHead(rtn); INS_Valid(ins); ins = INS_Next(ins))
+                    instrumentInstruction(ins);
+            }
+            RTN_Close(rtn);
+        }
+}
+
+void ExecHandler::instrumentRoutineExternal(RTN rtn)
+{
+    string name = RTN_Name(rtn);
+    if (name == "malloc" || name == "__libc_malloc")
+    {
+        RTN_InsertCall(rtn, IPOINT_BEFORE, (AFUNPTR)mem::mallocBefore,
+                   IARG_PTR, this, IARG_THREAD_ID,
+                   IARG_FUNCARG_ENTRYPOINT_VALUE, 0, IARG_END);
+        RTN_InsertCall(rtn, IPOINT_AFTER, (AFUNPTR)mem::mallocAfter,
+                   IARG_PTR, this, IARG_THREAD_ID,
+                   IARG_FUNCRET_EXITPOINT_VALUE, IARG_END);
+    }
+    if (name == "calloc" || name == "__libc_calloc")
+    {
+        RTN_InsertCall(rtn, IPOINT_BEFORE, (AFUNPTR)mem::callocBefore,
+                   IARG_PTR, this, IARG_THREAD_ID,
+                   IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
+                   IARG_FUNCARG_ENTRYPOINT_VALUE, 1,
+                   IARG_END);
+        RTN_InsertCall(rtn, IPOINT_AFTER, (AFUNPTR)mem::callocAfter,
+                   IARG_PTR, this, IARG_THREAD_ID,
+                   IARG_FUNCRET_EXITPOINT_VALUE, IARG_END);
+    }
+    else if (name == "free" || name == "__libc_free")
+    {
+        RTN_InsertCall(rtn, IPOINT_BEFORE, (AFUNPTR)mem::freeBefore,
+                   IARG_PTR, this, IARG_THREAD_ID,
+                   IARG_FUNCARG_ENTRYPOINT_VALUE, 0, IARG_END);
     }
 }
 
@@ -428,4 +581,10 @@ void ExecHandler::saveMemoryAccesses() const
         ofstream out(oss.str(), ios::app);
         out << (uint64_t)e.addr << " " << e.cycles - minCycles << endl;
     }
+}
+
+void ExecHandler::setLastCallInstruction(ADDRINT instAddr, THREADID threadId)
+{
+    Locker locker(&lock, threadId);
+    callStacks[threadId].lastCallInstruction = instAddr;
 }
