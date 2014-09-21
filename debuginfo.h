@@ -57,5 +57,6 @@ namespace dbg
         const FuncInfo* findFuncByName(const std::string& name) const;
         const FuncInfo* addFunc(const FuncInfo& f);
         const VarInfo* addVar(const VarInfo& f);
+        const VarInfo* findVarByAddress(void* addr) const;
     };
 }

@@ -84,7 +84,8 @@ void test(Func func, int n, double a[], double b[], double c[])
             double v = 0;
             for (int k = 0; k < n; k++)
                 v += a[i*n + k]*b[k*n + j];
-            err = max(err, abs(v - c[i*n + j]));
+            err = v - c[i*n + j];
+            //err = max(err, abs(v - c[i*n + j]));
         }
         
     cout << "error: " << err << endl;
@@ -93,7 +94,7 @@ void test(Func func, int n, double a[], double b[], double c[])
 
 int main(int argc, char** argv)
 {
-    const int n = 32;
+    const int n = 16;
     const int mix = stoi(argv[1]);
     mul mfuncs[4] = { &mul0, &mul1, &mul2, &mul3};
     //double a[n*n];

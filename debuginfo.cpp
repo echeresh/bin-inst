@@ -1,4 +1,6 @@
+#include <iostream>
 #include "debuginfo.h"
+using namespace std;
 
 namespace dbg
 {       
@@ -31,20 +33,20 @@ namespace dbg
     {
     }
         
-    DebugContext&  DebugContext::operator=(DebugContext&& d)
+    DebugContext& DebugContext::operator=(DebugContext&& d)
     {
         funcs = std::move(d.funcs);
         vars = std::move(d.vars);
         return *this;
     }
     
-    const FuncInfo*  DebugContext::findFuncByName(const std::string& name) const
+    const FuncInfo* DebugContext::findFuncByName(const std::string& name) const
     {
         auto it = funcs.find(name);
         return it != funcs.end() ? &it->second : nullptr;
     }
     
-    const FuncInfo*  DebugContext::addFunc(const FuncInfo& f)
+    const FuncInfo* DebugContext::addFunc(const FuncInfo& f)
     {
         auto ret = funcs.insert(make_pair(f.name, f));
         std::cout << f.name << std::endl;
@@ -52,11 +54,23 @@ namespace dbg
         return &ret.first->second;
     }
     
-    const VarInfo*  DebugContext::addVar(const VarInfo& f)
+    const VarInfo* DebugContext::addVar(const VarInfo& f)
     {
         auto ret = vars.insert(f);
         if (f.parent)
             const_cast<FuncInfo*>(f.parent)->vars.push_back(&*ret.first);
         return &*ret.first;
+    }
+    
+    const VarInfo* DebugContext::findVarByAddress(void* addr) const
+    {
+        for (auto& v : vars)
+            if (v.type == StorageType::Static)
+            {
+                char* varAddr = (char*)v.loc;
+                if (varAddr <= addr && addr < varAddr + v.size)
+                    return &v;
+            }
+        return nullptr;
     }
 }

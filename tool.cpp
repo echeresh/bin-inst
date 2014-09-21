@@ -4,6 +4,7 @@
 #include <vector>
 #include <set>
 #include <cassert>
+#include <thread>
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <unistd.h>
@@ -77,7 +78,7 @@ VOID Fini(INT32 code, VOID *v)
         // cout << "thread #" << i << " total write blocks: " << totalWrites << endl;
         // cout << "thread #" << i << " total read blocks:  " << totalReads << endl;
     // }
-    execHandler->saveMemoryAccesses();
+    //execHandler->saveMemoryAccesses();
     delete parser;
     delete execHandler;
 }
@@ -101,6 +102,7 @@ int main(int argc, char* argv[])
     dbgCtxt = parser->getDebugContext().toDbg();
     
     execHandler = new ExecHandler(binPath, dbgCtxt);
+
     PIN_InitSymbols();
     if (PIN_Init(argc, argv))
         return -1;
@@ -111,7 +113,8 @@ int main(int argc, char* argv[])
     //INS_AddInstrumentFunction(Instruction, 0);
     //TRACE_AddInstrumentFunction(Trace, 0);
     IMG_AddInstrumentFunction(ImageLoad, 0);
-    PIN_AddFiniFunction(Fini, 0);
+    PIN_AddFiniUnlockedFunction(Fini, 0);
+   
     PIN_StartProgram();
     return 0;
 }

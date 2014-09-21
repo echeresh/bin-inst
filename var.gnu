@@ -1,11 +1,12 @@
 var_desc=system("echo $VAR_DESC")
 
-set terminal png size 16000,8000
+set terminal png size 8000,4000
 set output 'out.png'
 set border linewidth 0.5
 set grid
 set ytics 128
-set pointsize 0.5
+set ytics add
+set pointsize 1.5
 set xlabel 'Cycles' 
 set ylabel 'Addresses'
 
@@ -40,19 +41,29 @@ do for [t=0:3] {
   }
 }
 
-set yr [0:max_y - min_y]
+min_y_call = 18446744073709551616.
+
+stats "calls" using 1:2
+min_x = min(min_x, STATS_min_x)
+max_x = max(max_x, STATS_max_x)
+min_y_call = min(min_y_call, STATS_min_y)
+
+set yr [min_y_call:max_y - min_y]
 set xr [min_x:max_x]
 
 set style line 1 lc rgb '#FF0000' pt 1   # +
 set style line 2 lc rgb '#00FF00' pt 7   # circle
 
-set multiplot layout 2, 2
+set style line 3 lc rgb '#0000FF'
 
-do for [t=0:3] {
+set multiplot layout 1, 1
+
+do for [t=0:1] {
   rr = sprintf('acc-R-%s-thr-%d',var_desc,t)
   ww = sprintf('acc-W-%s-thr-%d',var_desc,t)
   tr = sprintf('Read-thr%d',t)
   tw = sprintf('Write-thr%d',t)
   plot rr using 2:($1-min_y) title tr with points ls 1, \
-       ww using 2:($1-min_y) title tw with points ls 2
+       ww using 2:($1-min_y) title tw with points ls 2, \
+       "calls" using 1:2:ytic(3) title "calls" with lines ls 3
 }

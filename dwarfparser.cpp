@@ -355,6 +355,21 @@ namespace dwarf
                 ctxt.addVar(var);
             }
         }
+        //global variables (without parent)
+        for (auto& ve : vars)
+        {
+            auto& v = ve.second;
+            if (!v.parent)
+            {
+                assert(v.type == StorageType::Static);
+                auto& entries = v.location.entries;
+                if (entries.empty())
+                    continue;
+                auto& entry = entries.front();
+                dbg::VarInfo var(dbg::StorageType::Static, v.name, v.size, entry.off);
+                ctxt.addVar(var);
+            }
+        }
         return ctxt;
     }
     
@@ -537,7 +552,8 @@ namespace dwarf
             {
                 Dwarf_Half retForm;
                 dwarf_whatform(attr, &retForm, nullptr);
-                assert(retForm == DW_FORM_strp);
+                cout << retForm << endl;
+                assert(retForm == DW_FORM_strp || retForm == DW_FORM_string);
                 char* linkageNamePtr = nullptr;
                 dwarf_formstring(attr, &linkageNamePtr, NULL);
                 linkageName = linkageNamePtr;
@@ -569,7 +585,6 @@ namespace dwarf
         dwarf_whatform(attr, &retForm, nullptr);
         assert(retForm == DW_FORM_data1);
         DWARF_CHECK(dwarf_formsdata(attr, &walkInfo.lang, nullptr));
-
         walkTree(cuDie, walkInfo);
     }
 
