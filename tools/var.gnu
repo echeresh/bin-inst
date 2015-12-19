@@ -1,5 +1,7 @@
 var_desc=system("echo $VAR_DESC")
 
+print "enter"
+
 set terminal png size 8000,4000
 set output 'out.png'
 set border linewidth 0.5

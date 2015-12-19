@@ -14,7 +14,7 @@ namespace dbg
         Auto,
         Dynamic
     };
-    
+
     struct FuncInfo;
 
     struct VarInfo
@@ -24,11 +24,11 @@ namespace dbg
         std::string name;
         size_t size;
         ssize_t loc;
-       
+
         VarInfo(StorageType type, const std::string& name, size_t size,
                 ssize_t loc, const FuncInfo* parent = nullptr);
         VarInfo() = default;
-        
+
         //declare compare operator for storing in set
         bool operator<(const VarInfo& v) const;
     };
@@ -38,7 +38,7 @@ namespace dbg
         std::string name;
         std::vector<const VarInfo*> vars;
         ssize_t loc;
-        
+
         FuncInfo(const std::string& name, ssize_t loc);
     };
 
@@ -46,10 +46,10 @@ namespace dbg
     {
         std::map<std::string, FuncInfo> funcs;
         std::set<VarInfo> vars;
-        
+
         DebugContext(const DebugContext& d) = delete;
         DebugContext& operator=(const DebugContext& d) = delete;
-    
+
     public:
         DebugContext() = default;
         DebugContext(DebugContext&& d);
@@ -59,4 +59,4 @@ namespace dbg
         const VarInfo* addVar(const VarInfo& f);
         const VarInfo* findVarByAddress(void* addr) const;
     };
-}
+} //namespace dbg

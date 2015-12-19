@@ -26,7 +26,7 @@ void mul0(int n, double* a, double* b, double* c)
             double v = 0;
             for (int k = 0; k < n; k++)
                 v += a[i*n + k]*b[k*n + j];
-    
+
             c[i*n + j] = v;
         }
 }
@@ -40,7 +40,7 @@ void mul1(int n, double* a, double* b, double* c)
             #pragma omp parallel for reduction(+:v)
             for (int k = 0; k < n; k++)
                 v += a[i*n + k]*b[k*n + j];
-    
+
             c[i*n + j] = v;
         }
 }
@@ -87,15 +87,15 @@ void test(Func func, int n, double a[], double b[], double c[])
             err = v - c[i*n + j];
             //err = max(err, abs(v - c[i*n + j]));
         }
-        
+
     cout << "error: " << err << endl;
     cout << endl;
 }
 
 int main(int argc, char** argv)
 {
-    const int n = 16;
-    const int mix = stoi(argv[1]);
+    const int n = stoi(argv[1]);
+    const int mix = stoi(argv[2]);
     mul mfuncs[4] = { &mul0, &mul1, &mul2, &mul3};
     //double a[n*n];
     //double b[n*n];
@@ -109,6 +109,7 @@ int main(int argc, char** argv)
             a[i*n + j] = drand();
             b[i*n + j] = drand();
         }
-    test(*mfuncs[mix], n, a, b, c);
+    //test(*mfuncs[mix], n, a, b, c);
+    mul0(n, a, b, c);
     return 0;
 }
