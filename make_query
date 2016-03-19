@@ -1,0 +1,29 @@
+SOURCEDIR = src
+COMMONDIR = $(SOURCEDIR)/common
+QUERYDIR = $(SOURCEDIR)/query
+BUILDDIR = build
+
+SOURCES := $(shell find $(COMMONDIR) $(QUERYDIR) -name '*.cpp' -not -path '*/tool.cpp')
+OBJECTS := $(addprefix $(BUILDDIR)/,$(subst $(SOURCEDIR)/,,$(SOURCES:%.cpp=%.o)))
+
+INC = -I$(COMMONDIR) \
+      -I$(QUERYDIR) \
+      -I$(SOURCEDIR)
+
+CFLAGS = -O3 -g $(INC) -std=c++11
+
+#LIBS = -lpin -lxed -ldwarf -lelf -ldl
+
+LDFLAGS = -g $(LIBS)
+
+$(BUILDDIR)/%.o: $(SOURCEDIR)/%.cpp
+	mkdir -p $(dir $@)
+	g++ -std=c++11 -c $^ -o $@ $(CFLAGS)
+
+$(BUILDDIR)/query/query.exe: $(OBJECTS)
+	g++ -o $@ $^ $(CFLAGS) $(LDFLAGS)
+
+all: $(BUILDDIR)/query/query.exe
+
+# not delete object files
+.SECONDARY: $(OBJECTS)

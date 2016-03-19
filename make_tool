@@ -1,0 +1,49 @@
+SOURCEDIR = src
+COMMONDIR = $(SOURCEDIR)/common
+TOOLDIR = $(SOURCEDIR)/tool
+BUILDDIR = build
+
+SOURCES := $(shell find $(COMMONDIR) $(TOOLDIR) -name '*.cpp' -not -path '*/tool.cpp')
+OBJECTS := $(addprefix $(BUILDDIR)/,$(subst $(SOURCEDIR)/,,$(SOURCES:%.cpp=%.o)))
+
+INC = -I$(COMMONDIR) \
+      -I$(TOOLDIR) \
+      -I$(SOURCEDIR) \
+      -I$(PIN_ROOT)/source/include/pin \
+      -I$(PIN_ROOT)/source/include/pin/gen \
+      -I$(PIN_ROOT)/extras/components/include \
+      -I$(PIN_ROOT)/extras/xed2-intel64/include \
+      -I$(PIN_ROOT)/source/tools/InstLib \
+
+
+CFLAGS = -O3 -DTARGET_IA32E -DHOST_IA32E -fPIC -DTARGET_LINUX -g
+CFLAGS += $(INC)
+CFLAGS += -std=c++11
+
+LIBS = -L$(PIN_ROOT)/extras/xed2-intel64/lib \
+       -L$(PIN_ROOT)/intel64/lib \
+       -L$(PIN_ROOT)/intel64/lib-ext \
+       -L$(PIN_ROOT)/intel64/runtime/glibc \
+       -lpin -lxed -ldwarf -lelf -ldl
+
+LDFLAGS = -g \
+          $(LIBS) \
+          -Wl,--hash-style=sysv \
+          -Wl,-Bsymbolic \
+          -Wl,--version-script=$(PIN_ROOT)/source/include/pin/pintool.ver
+
+TOOL_CFLAGS = $(CFLAGS)
+TOOL_CFLAGS += -fomit-frame-pointer -DBIGARRAY_MULTIPLIER=1 \
+               -Wall -Werror -Wno-unknown-pragmas -fno-stack-protector
+
+$(BUILDDIR)/%.o: $(SOURCEDIR)/%.cpp
+	mkdir -p $(dir $@)
+	g++ -std=c++11 -c $^ -o $@ $(CFLAGS)
+
+$(BUILDDIR)/tool/%.so: $(SOURCEDIR)/tool/%.cpp $(OBJECTS)
+	g++ -shared -o $@ $^ $(TOOL_CFLAGS) $(LDFLAGS)
+
+all: $(BUILDDIR)/tool/tool.so
+
+# not delete object files
+.SECONDARY: $(OBJECTS)
