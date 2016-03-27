@@ -1,9 +1,11 @@
 #!/bin/bash
 
-#make clean
+make clean
 set -e
-make tool.so
+make -f make_tool build/tool/tool.so -j 4
 
-g++ -o test.out test/test.cpp -std=c++11 -fopenmp -gdwarf-2 -O2
+g++ -o build/test.out test/test.cpp -std=c++11 -fopenmp -gdwarf-2 -O2
 
-${PIN_ROOT}/pin.sh -t tool.so -- ./test.out 16 0
+${PIN_ROOT}/pin.sh -t build/tool/tool.so -- ./build/test.out 16 0
+
+rm -rf calls dwarf.log
