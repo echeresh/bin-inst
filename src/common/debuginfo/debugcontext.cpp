@@ -31,11 +31,11 @@ namespace dbginfo
         return it != idFuncs.end() ? it->second : nullptr;
     }
 
-    const FuncInfo* DebugContext::addFunc(const std::string& name, ssize_t loc)
+    const FuncInfo* DebugContext::addFunc(const std::string& name, ssize_t stackOffset)
     {
         cout << "ADDED: " << name << endl;
         int id = funcs.size();
-        auto ret = funcs.insert(make_pair(name, FuncInfo(name, loc, id)));
+        auto ret = funcs.insert(make_pair(name, FuncInfo(name, stackOffset, id)));
         assert(ret.second);
         idFuncs.insert(make_pair(id, &ret.first->second));
         return &ret.first->second;
@@ -54,12 +54,29 @@ namespace dbginfo
         for (auto& v : vars)
             if (v.type == StorageType::Static)
             {
-                char* varAddr = (char*)v.loc;
+                char* varAddr = (char*)v.stackOffset;
                 if (varAddr <= addr && addr < varAddr + v.size)
                     return &v;
             }
         return nullptr;
     }
+
+    void DebugContext::setInstBinding(uint64_t inst, const SourceLocation& sourceLocation)
+    {
+        assert(sourceLocation);
+        auto ret = instBindings.insert(make_pair(inst, sourceLocation));
+        if (!ret.second)
+        {
+            assert(sourceLocation == ret.first->second);
+        }
+    }
+
+    SourceLocation DebugContext::getInstBinding(uint64_t inst) const
+    {
+        auto it = instBindings.find(inst);
+        return it == instBindings.end() ? SourceLocation() : it->second;
+    }
+
     void DebugContext::save(std::ostream& out) const
     {
         auto nFuncs = funcs.size();
@@ -74,6 +91,12 @@ namespace dbginfo
         for (auto& varInfo: vars)
         {
             varInfo.save(out, *this);
+        }
+        utils::save(instBindings.size(), out);
+        for (auto e: instBindings)
+        {
+            utils::save(e.first, out);
+            e.second.save(out);
         }
     }
 
@@ -100,6 +123,14 @@ namespace dbginfo
             {
                 const_cast<FuncInfo*>(ret.first->parent)->vars.push_back(&*ret.first);
             }
+        }
+        auto nInstBindings = utils::load<std::map<uint64_t, SourceLocation>::size_type>(in);
+        for (int i = 0; i < nInstBindings; i++)
+        {
+            auto inst = utils::load<uint64_t>(in);
+            SourceLocation sourceLoc;
+            sourceLoc.load(in);
+            instBindings[inst] = sourceLoc;
         }
     }
 } //namespace dbginfo

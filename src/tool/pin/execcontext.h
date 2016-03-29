@@ -64,7 +64,7 @@ namespace pin
         static const int MaxThreads = 64;
 
         const std::string binPath;
-        const dbginfo::DebugContext& dbgCtxt;
+        dbginfo::DebugContext& dbgCtxt;
 
         HeapInfo heapInfo;
         std::vector<CallStack> callStacks;
@@ -73,15 +73,15 @@ namespace pin
 
         MemoryObject findNonStackObject(void* addr, size_t size);
         MemoryObject findStackObject(void* addr, size_t size);
-        std::string getVarNameFromFile(const std::string& filePath, int lineNumber) const;
+        std::string getVarNameFromFile(const SourceLocation& sourceLoc) const;
+        SourceLocation getSourceLocation(ADDRINT inst) const;
 
     public:
-        ExecContext(const std::string& binPath, const dbginfo::DebugContext& dbgCtxt);
+        ExecContext(const std::string& binPath, dbginfo::DebugContext& dbgCtxt);
         int getRoutineId(RTN rtn);
         void addEvent(const Event& event);
         MemoryObject findObject(void* addr, int size);
         EventManager dumpEvents();
         void saveMemoryAccesses() const;
-        //const RoutineInfo* findRoutine(int routineId) const;
     };
 } //namespace pin

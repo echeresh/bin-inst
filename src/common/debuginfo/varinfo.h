@@ -16,11 +16,11 @@ namespace dbginfo
         const FuncInfo* parent = nullptr;
         std::string name;
         size_t size;
-        ssize_t loc;
+        ssize_t stackOffset;
 
         VarInfo() = default;
         VarInfo(StorageType type, const std::string& name, size_t size,
-                ssize_t loc, const FuncInfo* parent = nullptr);
+                ssize_t stackOffset, const FuncInfo* parent = nullptr);
 
         //declare compare operator for storing in set
         bool operator<(const VarInfo& v) const;

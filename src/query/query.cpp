@@ -7,7 +7,6 @@ using namespace std;
 
 int main()
 {
-    cout << "query" << endl;
     dbginfo::DebugContext debugContext;
     std::ifstream dbgIn(DEBUG_INFO_PATH, std::ios::binary);
     debugContext.load(dbgIn);
@@ -18,7 +17,19 @@ int main()
     while (eventManager.hasNext())
     {
         auto e = eventManager.next();
-        cout << e.str(eventManager) << endl;
+        //cout << e.str(eventManager) << endl;
+        if (e.type == EventType::Read || e.type == EventType::Write)
+        {
+            auto inst = e.memoryEvent.instAddr;
+            if (inst > 0)
+            {
+                auto sourceLoc = debugContext.getInstBinding(inst);
+                if (sourceLoc)
+                {
+                    cout << (void*)inst << " -> " << sourceLoc.fileName << ":" << sourceLoc.line << endl;
+                }
+            }
+        }
     }
     return 0;
 }

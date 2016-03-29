@@ -13,11 +13,11 @@ namespace dbginfo
     {
         std::string name;
         std::vector<const VarInfo*> vars;
-        ssize_t loc; //TODO: refactor
+        ssize_t stackOffset;
         int id;
 
         FuncInfo() = default;
-        FuncInfo(const std::string& name, ssize_t loc, int id);
+        FuncInfo(const std::string& name, ssize_t stackOffset, int id);
         void save(std::ostream& out, const DebugContext& dbgCtxt) const;
         void load(std::istream& in, const DebugContext& dbgCtxt);
     };

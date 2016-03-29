@@ -76,12 +76,12 @@ namespace pin
 
         static void memoryRead(PinHandler* execHandler, VOID* ip, THREADID threadId, VOID* addr, UINT32 size)
         {
-            execHandler->handleMemoryRead(threadId, addr, size);
+            execHandler->handleMemoryRead(threadId, addr, size, ip);
         }
 
         static void memoryWrite(PinHandler* execHandler, VOID* ip, THREADID threadId, VOID* addr, UINT32 size)
         {
-            execHandler->handleMemoryWrite(threadId, addr, size);
+            execHandler->handleMemoryWrite(threadId, addr, size, ip);
         }
     };
 
@@ -110,7 +110,7 @@ namespace pin
     //PinHandler
     //------------------------------------------------------------------------------
 
-    PinHandler::PinHandler(const string& binPath, const dbginfo::DebugContext& dbgCtxt) :
+    PinHandler::PinHandler(const string& binPath, dbginfo::DebugContext& dbgCtxt) :
         binPath(binPath),
         execCtxt(binPath, dbgCtxt)
     {
@@ -145,17 +145,17 @@ namespace pin
         execCtxt.addEvent(e);
     }
 
-    void PinHandler::handleMemoryRead(THREADID threadId, void* addr, size_t size)
+    void PinHandler::handleMemoryRead(THREADID threadId, void* addr, size_t size, VOID* ip)
     {
         Locker locker(&lock, threadId);
-        Event e(EventType::Read, threadId, addr, size);
+        Event e(EventType::Read, threadId, addr, size, (uint64_t)ip);
         execCtxt.addEvent(e);
     }
 
-    void PinHandler::handleMemoryWrite(THREADID threadId, void* addr, size_t size)
+    void PinHandler::handleMemoryWrite(THREADID threadId, void* addr, size_t size, VOID* ip)
     {
         Locker locker(&lock, threadId);
-        Event e(EventType::Write, threadId, addr, size);
+        Event e(EventType::Write, threadId, addr, size, (uint64_t)ip);
         execCtxt.addEvent(e);
     }
 

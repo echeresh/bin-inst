@@ -20,13 +20,13 @@ namespace pin
         ExecContext execCtxt;
 
     public:
-        PinHandler(const std::string& binPath, const dbginfo::DebugContext& dbgCtxt);
+        PinHandler(const std::string& binPath, dbginfo::DebugContext& dbgCtxt);
         void handleHeapAlloc(THREADID threadId, void* addr, size_t size);
         void handleHeapFree(THREADID threadId, void* addr);
         void handleRoutineEnter(CONTEXT* ctxt, THREADID threadId, int routineId);
         void handleRoutineExit(CONTEXT* ctxt, THREADID threadId, int routineId);
-        void handleMemoryRead(THREADID threadId, void* addr, size_t size);
-        void handleMemoryWrite(THREADID threadId, void* addr, size_t size);
+        void handleMemoryRead(THREADID threadId, void* addr, size_t size, VOID* ip);
+        void handleMemoryWrite(THREADID threadId, void* addr, size_t size, VOID* ip);
 
         void instrumentImageLoad(IMG img);
         void instrumentRoutine(RTN rtn);

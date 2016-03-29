@@ -30,10 +30,9 @@ std::string MemoryEvent::str(const EventManager& eventManager) const
 {
     std::ostringstream oss;
     oss << "thread: " << threadId << "; addr: " << addr
-        << "; size: " << size << "; t: " << t;
+        << "; size: " << size << "; inst: " << (void*)instAddr << "; t: " << t;
     return oss.str();
 }
-
 
 std::string RoutineEvent::str(const EventManager& eventManager) const
 {
@@ -41,7 +40,7 @@ std::string RoutineEvent::str(const EventManager& eventManager) const
     auto* funcInfo = eventManager.getDebugContext().findFuncById(routineId);
     if (funcInfo)
         oss << funcInfo->name << "; ";
-    oss << "thread: " << threadId << "; t: " << t;
+    oss << "thread: " << threadId << "; inst: " << (void*)instAddr << "; t: " << t;
     return oss.str();
 }
 
@@ -50,37 +49,37 @@ Event::Event(EventType type, uint32_t threadId, void* addr, size_t size, uint64_
 {
     switch (type)
     {
-    case EventType::Read:
-    case EventType::Write:
-    case EventType::Alloc:
-    case EventType::Free:
-        memoryEvent.t = utils::rdtsc();
-        memoryEvent.threadId = threadId;
-        memoryEvent.addr = addr;
-        memoryEvent.size = size;
-        memoryEvent.instAddr = instAddr;
-        break;
-    default:
-        assert(false);
+        case EventType::Read:
+        case EventType::Write:
+        case EventType::Alloc:
+        case EventType::Free:
+            memoryEvent.t = utils::rdtsc();
+            memoryEvent.threadId = threadId;
+            memoryEvent.addr = addr;
+            memoryEvent.size = size;
+            memoryEvent.instAddr = instAddr;
+            break;
+        default:
+            assert(false);
     }
 }
 
-Event::Event(EventType type, uint32_t threadId, int routineId, void* spValue, uint64_t instAddr) :
+Event::Event(EventType type, uint32_t threadId, int routineId, void* stackPointerRegister, uint64_t instAddr) :
     type(type)
 {
     switch (type)
     {
-    case EventType::CallInst:
-    case EventType::Call:
-    case EventType::Ret:
-        routineEvent.t = utils::rdtsc();
-        routineEvent.threadId = threadId;
-        routineEvent.routineId = routineId;
-        routineEvent.spValue = spValue;
-        routineEvent.instAddr = instAddr;
-        break;
-    default:
-        assert(false);
+        case EventType::CallInst:
+        case EventType::Call:
+        case EventType::Ret:
+            routineEvent.t = utils::rdtsc();
+            routineEvent.threadId = threadId;
+            routineEvent.routineId = routineId;
+            routineEvent.stackPointerRegister = stackPointerRegister;
+            routineEvent.instAddr = instAddr;
+            break;
+        default:
+            assert(false);
     }
 }
 
@@ -90,16 +89,16 @@ std::string Event::str(const EventManager& eventManager) const
     oss << to_string(type) << "[";
     switch (type)
     {
-    case EventType::Read:
-    case EventType::Write:
-    case EventType::Alloc:
-    case EventType::Free:
-        oss << memoryEvent.str(eventManager);
-        break;
-    case EventType::Call:
-    case EventType::Ret:
-        oss << routineEvent.str(eventManager);
-        break;
+        case EventType::Read:
+        case EventType::Write:
+        case EventType::Alloc:
+        case EventType::Free:
+            oss << memoryEvent.str(eventManager);
+            break;
+        case EventType::Call:
+        case EventType::Ret:
+            oss << routineEvent.str(eventManager);
+            break;
     }
     oss << "]";
     return oss.str();

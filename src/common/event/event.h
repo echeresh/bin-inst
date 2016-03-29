@@ -1,5 +1,7 @@
 #pragma once
+#include <fstream>
 #include <string>
+#include "common/utils.h"
 
 enum class EventType
 {
@@ -10,6 +12,42 @@ enum class EventType
     Write,
     Alloc,
     Free
+};
+
+struct SourceLocation
+{
+    std::string fileName;
+    int line;
+
+    SourceLocation() = default;
+    SourceLocation(const std::string& fileName, int line):
+        fileName(fileName),
+        line(line)
+    {
+    }
+
+    operator bool() const
+    {
+        return !fileName.empty();
+    }
+
+    bool operator==(const SourceLocation& sourceLocation) const
+    {
+        return fileName == sourceLocation.fileName &&
+               line == sourceLocation.line;
+    }
+
+    void save(std::ostream& out) const
+    {
+        utils::save(fileName, out);
+        utils::save(line, out);
+    }
+
+    void load(std::istream& in)
+    {
+        fileName = utils::load<std::string>(in);
+        line = utils::load<int>(in);
+    }
 };
 
 std::string to_string(EventType type);
@@ -32,7 +70,7 @@ struct RoutineEvent
     uint64_t t;
     uint32_t threadId;
     int routineId;
-    void* spValue;
+    void* stackPointerRegister;
     uint64_t instAddr;
 
     std::string str(const EventManager& eventManager) const;
@@ -49,6 +87,6 @@ struct Event
 
     Event() = default;
     Event(EventType type, uint32_t threadId, void* addr, size_t size = 0, uint64_t instAddr = 0);
-    Event(EventType type, uint32_t threadId, int routineId, void* spValue, uint64_t instAddr = 0);
+    Event(EventType type, uint32_t threadId, int routineId, void* stackPointerRegister, uint64_t instAddr = 0);
     std::string str(const EventManager& eventManager) const;
 };
