@@ -86,7 +86,7 @@ namespace dwarf
             if (entry.reg != LocSource::RSP)
                 continue;
             ssize_t loc = entry.off;
-            auto* pFuncInfo = ctxt.addFunc(name, loc);
+            auto* pFuncInfo = ctxt.addFunc(dbginfo::FuncInfo(name, loc));
             for (auto& pv : f.vars)
             {
                 auto& v = *pv;

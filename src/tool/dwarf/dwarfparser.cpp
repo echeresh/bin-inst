@@ -6,7 +6,6 @@
 #include "dwarfutils.h"
 #include "dwarfparser.h"
 #include "dwarflog.h"
-#include "common/offsetostream.h"
 using namespace std;
 
 namespace dwarf

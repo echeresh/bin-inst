@@ -94,7 +94,7 @@ namespace pattern
         byte* baseAddr = accesses[0].addr - MAX_HALF_OFFSET;
         size_t hashCode = accessHashCode(accesses[0], baseAddr);
         size_t factor = MAX_HALF_OFFSET * 2 * 2;
-        std::string name = accesses[0].name;
+        std::string name = accesses[0].name();
         for (int i = 1; i < WINDOW_SIZE; i++)
         {
             long long diff = (long long)accesses[i].addr - (long long)baseAddr;
@@ -105,7 +105,7 @@ namespace pattern
             }
             size_t hc = accessHashCode(accesses[i], baseAddr);
             hashCode = hashCode * factor + hc;
-            name += " " + accesses[i].name;
+            name += " " + accesses[i].name();
         }
         if (hashCode == 0)
         {

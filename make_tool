@@ -1,3 +1,5 @@
+include commons.mk
+
 SOURCEDIR = src
 COMMONDIR = $(SOURCEDIR)/common
 TOOLDIR = $(SOURCEDIR)/tool
@@ -16,9 +18,10 @@ INC = -I$(COMMONDIR) \
       -I$(PIN_ROOT)/source/tools/InstLib \
 
 
-CFLAGS = -O3 -DTARGET_IA32E -DHOST_IA32E -fPIC -DTARGET_LINUX -g
+CFLAGS += -O3 -DTARGET_IA32E -DHOST_IA32E -fPIC -DTARGET_LINUX -g
 CFLAGS += $(INC)
 CFLAGS += -std=c++11
+CFLAGS += -MMD -MP
 
 LIBS = -L$(PIN_ROOT)/extras/xed2-intel64/lib \
        -L$(PIN_ROOT)/intel64/lib \
@@ -38,12 +41,14 @@ TOOL_CFLAGS += -fomit-frame-pointer -DBIGARRAY_MULTIPLIER=1 \
 
 $(BUILDDIR)/%.o: $(SOURCEDIR)/%.cpp
 	mkdir -p $(dir $@)
-	g++ -std=c++11 -c $^ -o $@ $(CFLAGS)
+	g++ -std=c++11 -c $< -o $@ $(CFLAGS)
 
 $(BUILDDIR)/tool/%.so: $(SOURCEDIR)/tool/%.cpp $(OBJECTS)
 	g++ -shared -o $@ $^ $(TOOL_CFLAGS) $(LDFLAGS)
 
 all: $(BUILDDIR)/tool/tool.so
+
+-include $(OBJECTS:%.o=%.d)
 
 # not delete object files
 .SECONDARY: $(OBJECTS)

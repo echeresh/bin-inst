@@ -1,3 +1,5 @@
+include commons.mk
+
 SOURCEDIR = src
 COMMONDIR = $(SOURCEDIR)/common
 QUERYDIR = $(SOURCEDIR)/query
@@ -10,7 +12,7 @@ INC = -I$(COMMONDIR) \
       -I$(QUERYDIR) \
       -I$(SOURCEDIR)
 
-CFLAGS = -O3 -g $(INC) -std=c++11
+CFLAGS += -O0 -g $(INC) -std=c++11 -MMD -MP
 
 #LIBS = -lpin -lxed -ldwarf -lelf -ldl
 
@@ -18,12 +20,14 @@ LDFLAGS = -g $(LIBS)
 
 $(BUILDDIR)/%.o: $(SOURCEDIR)/%.cpp
 	mkdir -p $(dir $@)
-	g++ -std=c++11 -c $^ -o $@ $(CFLAGS)
+	g++ -std=c++11 -c $< -o $@ $(CFLAGS)
 
 $(BUILDDIR)/query/query.exe: $(OBJECTS)
 	g++ -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
 all: $(BUILDDIR)/query/query.exe
+
+-include $(OBJECTS:%.o=%.d)
 
 # not delete object files
 .SECONDARY: $(OBJECTS)

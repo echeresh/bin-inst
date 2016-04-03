@@ -12,6 +12,7 @@ namespace dbginfo
 
     struct VarInfo
     {
+        int id = -1;
         StorageType type;
         const FuncInfo* parent = nullptr;
         std::string name;

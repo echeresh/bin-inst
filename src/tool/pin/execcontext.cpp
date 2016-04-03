@@ -5,16 +5,6 @@ using namespace std;
 namespace pin
 {
     //------------------------------------------------------------------------------
-    //FuncCall
-    //------------------------------------------------------------------------------
-
-    FuncCall::FuncCall(const dbginfo::FuncInfo* funcInfo, void* frameBase) :
-        funcInfo(funcInfo),
-        frameBase(frameBase)
-    {
-    }
-
-    //------------------------------------------------------------------------------
     //MemoryObject
     //------------------------------------------------------------------------------
 
@@ -50,58 +40,6 @@ namespace pin
         return addr < o.addr;
     }
 
-    //------------------------------------------------------------------------------
-    //CallStack
-    //------------------------------------------------------------------------------
-
-    void CallStack::addCall(const FuncCall& call)
-    {
-        //cleanup call stack
-        while (!calls.empty() && calls.back().frameBase <= call.frameBase)
-            calls.pop_back();
-        calls.push_back(call);
-    }
-
-    MemoryObject CallStack::findObject(void* addr, size_t size)
-    {
-        //cout << "stack find object " << calls.size() << endl;
-        for (int i = calls.size() - 1; i >= 0; i--)
-        {
-            auto& call = calls[i];
-            if (addr <= call.frameBase)
-            {
-                for (auto& var : call.funcInfo->vars)
-                {
-                    char* varAddr = (char*)call.frameBase + var->stackOffset;
-                    if (varAddr <= addr && addr <= varAddr + var->size - 1)
-                    {
-                        //cout << "found object: " << var->name << endl;
-                        assert((char*)addr + size <= varAddr + var->size);
-                        return MemoryObject(varAddr, var->size, var);
-                    }
-                }
-            }
-        }
-        return MemoryObject();
-    }
-
-    string CallStack::str() const
-    {
-        ostringstream oss;
-        for (int i = 0; i < (int)calls.size(); i++)
-            oss << calls[i].funcInfo->name << " frame base: " << calls[i].frameBase << endl;
-        return oss.str();
-    }
-
-    const FuncCall& CallStack::top() const
-    {
-        return calls.back();
-    }
-
-    void CallStack::pop()
-    {
-        calls.pop_back();
-    }
 
     template <class Cont, class TKey>
     typename Cont::iterator lessFirst(Cont& c, const TKey& key)
@@ -119,36 +57,32 @@ namespace pin
     //HeapInfo
     //------------------------------------------------------------------------------
 
-    void HeapInfo::handleAlloc(void* addr, size_t size, const std::string& varName)
+    void HeapInfo::handleAlloc(dbginfo::DebugContext& dbgCtxt, MemoryEvent& memoryEvent, const std::string& varName)
     {
         static int id = 0;
-        auto* varInfo = new dbginfo::VarInfo(dbginfo::StorageType::Dynamic,
-                                         varName + "#" + std::to_string(id++),
-                                         size, (ssize_t)addr);
-        auto ret = objects.insert(MemoryObject(addr, size, varInfo));
-        if (!ret.second)
-        {
-            //cout << "heap-error: " << addr << " " << size << endl;
-        }
-        cout << "alloc: " << size << "#" + std::to_string(id) << endl;
+        auto* varInfo = dbgCtxt.addVar(dbginfo::VarInfo(dbginfo::StorageType::Dynamic,
+                                                        varName + "#" + std::to_string(id++),
+                                                        memoryEvent.size, (ssize_t)memoryEvent.addr));
+        memoryEvent.varId = varInfo->id;
+        auto ret = objects.insert(MemoryObject(memoryEvent.addr, memoryEvent.size, varInfo));
+        assert(ret.second);
     }
 
-    void HeapInfo::handleFree(void* addr)
+    void HeapInfo::handleFree(dbginfo::DebugContext& dbgCtxt, MemoryEvent& memoryEvent)
     {
-        auto it = objects.find(MemoryObject(addr));
+        auto it = objects.find(MemoryObject(memoryEvent.addr));
         if (it == objects.end())
+        {
             return;
-        //delete it->varInfo;
+        }
         objects.erase(it);
     }
 
     MemoryObject HeapInfo::findObject(void* addr, size_t size) const
     {
-        //cout << "heap " << objects.size() << endl;
         auto it = lessFirst(objects, addr);
         if (it == objects.end())
         {
-            std::cout << "not found1" << std::endl;
             return MemoryObject();
         }
 
@@ -157,7 +91,6 @@ namespace pin
             assert((char*)addr + size <= it->hi());
             return *it;
         }
-        std::cout << "not found2" << std::endl;
         return MemoryObject();
     }
 
@@ -168,7 +101,7 @@ namespace pin
     ExecContext::ExecContext(const std::string& binPath, dbginfo::DebugContext& dbgCtxt) :
         binPath(binPath),
         dbgCtxt(dbgCtxt),
-        callStacks(MaxThreads)
+        callStackGlobal(MAX_THREADS)
 
     {
     }
@@ -177,21 +110,41 @@ namespace pin
     {
         auto mo = heapInfo.findObject(addr, size);
         if (!mo.isEmpty())
+        {
             return mo;
+        }
         auto* varInfo = dbgCtxt.findVarByAddress(addr);
         if (varInfo)
+        {
             return MemoryObject((void*)varInfo->stackOffset, varInfo->size, varInfo);
+        }
         return MemoryObject();
     }
 
     MemoryObject ExecContext::findStackObject(void* addr, size_t size)
     {
         int i = 0;
-        //for (int i = 0; i < callStacks.size(); i++)
         {
-            auto mo = callStacks[i].findObject(addr, size);
-            if (!mo.isEmpty())
-                return mo;
+            {
+                auto& calls = callStackGlobal.getCalls(i);
+                for (int i = calls.size() - 1; i >= 0; i--)
+                {
+                    auto& call = calls[i];
+                    if (addr <= call.frameBase)
+                    {
+                        for (auto& var : call.funcInfo->vars)
+                        {
+                            char* varAddr = (char*)call.frameBase + var->stackOffset;
+                            if (varAddr <= addr && addr <= varAddr + var->size - 1)
+                            {
+                                //cout << "found object: " << var->name << endl;
+                                assert((char*)addr + size <= varAddr + var->size);
+                                return MemoryObject(varAddr, var->size, var);
+                            }
+                        }
+                    }
+                }
+            }
         }
         return MemoryObject();
     }
@@ -199,7 +152,9 @@ namespace pin
     std::string ExecContext::getVarNameFromFile(const SourceLocation& sourceLoc) const
     {
         if (sourceLoc.line == 0 || sourceLoc.fileName.empty())
+        {
             return "";
+        }
         ifstream in(sourceLoc.fileName);
         string line;
         for (int i = 0; i < sourceLoc.line; i++)
@@ -261,8 +216,6 @@ namespace pin
 
     MemoryObject ExecContext::findObject(void* addr, int size)
     {
-        static double tt;
-        double t = utils::dsecnd();
         MemoryObject mo;
         if (addr > (void*)0x70000000000)
         {
@@ -272,141 +225,90 @@ namespace pin
         {
             mo = findNonStackObject(addr, size);
         }
-
-        t = utils::dsecnd() - t;
-        tt += t;
-        //cout << t << " " << tt << endl;
         return mo;
     }
 
     EventManager ExecContext::dumpEvents()
     {
         EventManager em = eventDumper.finalize(dbgCtxt);
-        //std::ofstream callOut("calls");
-        //std::map<long long, std::ofstream*> accFiles;
-        //std::map<const dbginfo::FuncInfo*, int> routineLabels;
-        //std::map<const dbginfo::FuncInfo*, std::ostringstream*> routineCalls;
         int processed = 0;
         double t_all = utils::dsecnd();
         double tt = 0;
+        std::vector<ADDRINT> callInstructions(MAX_THREADS);
         while (em.hasNext())
         {
-            double t = utils::dsecnd();
             processed++;
             if (processed % 10 == 0)
             {
                 std::cout << "completed: " << processed * 100. / em.size() << "%" << std::endl;
             }
 
-            Event e = em.next();
-            //cout << e.str(*this) << endl;
+            Event& e = em.next();
             switch (e.type)
             {
                 case EventType::Alloc:
                 {
-                    auto sourceLoc = getSourceLocation(callStacks[e.memoryEvent.threadId].lastCallInstruction);
-                    //cout << "malloc before: " << column << " " << line << " " << fileName << endl;
+                    auto sourceLoc = getSourceLocation(callInstructions[e.memoryEvent.threadId]);
                     string varName = getVarNameFromFile(sourceLoc);
-                    heapInfo.handleAlloc(e.memoryEvent.addr, e.memoryEvent.size, varName);
+                    heapInfo.handleAlloc(dbgCtxt, e.memoryEvent, varName);
                     break;
                 }
                 case EventType::Free:
                 {
-                    heapInfo.handleFree(e.memoryEvent.addr);
+                    heapInfo.handleFree(dbgCtxt, e.memoryEvent);
                     break;
                 }
                 //handle call instruction to save address of call instruction calling malloc
                 case EventType::CallInst:
                 {
-                    callStacks[e.routineEvent.threadId].lastCallInstruction = e.routineEvent.instAddr;
+                    callInstructions[e.routineEvent.threadId] = e.routineEvent.instAddr;
                     break;
                 }
-                case EventType::Call:
+                /*case EventType::Call:
                 case EventType::Ret:
                 {
-                    //auto& rtnInfo = routines[e.routineEvent.routineId];
                     auto* funcInfo = dbgCtxt.findFuncById(e.routineEvent.routineId);
-                    //cout << "call or ret" << endl;
                     if (!funcInfo)
                     {
                         break;
                     }
 
+                    void* frameBase = (char*)e.routineEvent.stackPointerRegister + funcInfo->stackOffset;
+                    FuncCall funcCall(funcInfo, frameBase);
+
                     if (e.type == EventType::Call)
                     {
-                        //cout << "call " << rtnInfo.name << endl;
-                        void* frameBase = (char*)e.routineEvent.stackPointerRegister + funcInfo->stackOffset;
-                        callStacks[e.routineEvent.threadId].addCall(FuncCall(funcInfo, frameBase));
+                        callStackGlobal.push(e.routineEvent.threadId, funcCall);
                     }
                     else
                     {
-                        //cout << "exit " << rtnInfo.name << endl;
-                        assert(callStacks[e.routineEvent.threadId].top().funcInfo == funcInfo);
-                        void* frameBase = (char*)e.routineEvent.stackPointerRegister + funcInfo->stackOffset;
-                        assert(callStacks[e.routineEvent.threadId].top().frameBase == frameBase);
-                        callStacks[e.routineEvent.threadId].pop();
+                        callStackGlobal.pop(e.routineEvent.threadId, funcCall);
                     }
-
-                    //if (routineLabels.find(funcInfo) == routineLabels.end())
-                    //{
-                    //    routineLabels[funcInfo] = -routineLabels.size()*128;
-                    //    routineCalls[funcInfo] = new ostringstream;
-                    //}
-                    //int ylabel = routineLabels[funcInfo];
-                    //auto& oss = *routineCalls[funcInfo];
-                    //oss << e.routineEvent.t << " " << ylabel << " " << rtnInfo.name << endl;
-                    //if (e.type == EventType::Ret)
-                    //    oss << endl;
-
                     break;
-                }
+                }*/
                 case EventType::Read:
                 case EventType::Write:
                 {
                     auto& memoryEvent = e.memoryEvent;
                     auto mo = findObject(memoryEvent.addr, memoryEvent.size);
-                    //cout << "rw object" << endl;
                     if (!mo.isEmpty())
                     {
+                        memoryEvent.varId = mo.varInfo->id;
                         if (auto sourceLoc = getSourceLocation(memoryEvent.instAddr))
                         {
                             dbgCtxt.setInstBinding(memoryEvent.instAddr, sourceLoc);
                         }
                         assert(mo.varInfo);
-                        //long long hc = (long long)mo.varInfo >> 3;
-                        //hc += memoryEvent.threadId * 2 + (e.type == EventType::Read ? 0 : 1);
-                        //cout << "hc = " << hc << endl;
-                        /*if (accFiles.find(hc) == accFiles.end())
-                        {
-                            cout << "hc2 = " << hc << endl;
-                            ostringstream oss;
-                            oss << "_trash/acc-" << (e.type == EventType::Read ? "R-" : "W-")
-                                << mo.name() << "-sz-"
-                                << mo.size << "-thr-" << (memoryEvent.threadId == 0 ? 0 : memoryEvent.threadId - 1);
-                            //skipped internal thread with id = 1
-                            accFiles[hc] = new ofstream(oss.str());
-                        }
-                        *accFiles[hc] << (uint64_t)memoryEvent.addr << " " << memoryEvent.t << endl;*/
+                    }
+                    else
+                    {
+                        memoryEvent.varId = -1;
                     }
                     break;
                 }
             }
-            t = utils::dsecnd() - t;
-            tt += t;
-            //cout << "(1) " << t << endl;
         }
-        cout << utils::dsecnd() - t_all << endl;
-        cout << tt << endl;
-        /*for (auto& e : routineCalls)
-        {
-            callOut << e.second->str();
-            delete e.second;
-        }
-
-        for (auto& e : accFiles)
-        {
-            delete e.second;
-        }*/
+        em.dump();
         return em;
     }
 } //namespace pin

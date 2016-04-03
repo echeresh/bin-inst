@@ -31,13 +31,12 @@ namespace dbginfo
         return it != idFuncs.end() ? it->second : nullptr;
     }
 
-    const FuncInfo* DebugContext::addFunc(const std::string& name, ssize_t stackOffset)
+    const FuncInfo* DebugContext::addFunc(const FuncInfo& funcInfo)
     {
-        cout << "ADDED: " << name << endl;
-        int id = funcs.size();
-        auto ret = funcs.insert(make_pair(name, FuncInfo(name, stackOffset, id)));
+        cout << "ADDED: " << funcInfo.name << endl;
+        auto ret = funcs.insert(make_pair(funcInfo.name, funcInfo));
         assert(ret.second);
-        idFuncs.insert(make_pair(id, &ret.first->second));
+        idFuncs.insert(make_pair(funcInfo.id, &ret.first->second));
         return &ret.first->second;
     }
 
@@ -45,19 +44,32 @@ namespace dbginfo
     {
         auto ret = vars.insert(varInfo);
         if (varInfo.parent)
+        {
             const_cast<FuncInfo*>(varInfo.parent)->vars.push_back(&*ret.first);
+        }
+        idVars[varInfo.id] = &*ret.first;
         return &*ret.first;
+    }
+
+    const VarInfo* DebugContext::findVarById(int id) const
+    {
+        auto it = idVars.find(id);
+        return it != idVars.end() ? it->second : nullptr;
     }
 
     const VarInfo* DebugContext::findVarByAddress(void* addr) const
     {
         for (auto& v : vars)
+        {
             if (v.type == StorageType::Static)
             {
                 char* varAddr = (char*)v.stackOffset;
                 if (varAddr <= addr && addr < varAddr + v.size)
+                {
                     return &v;
+                }
             }
+        }
         return nullptr;
     }
 
@@ -119,6 +131,7 @@ namespace dbginfo
             varInfo.load(in, *this);
             auto ret = vars.insert(varInfo);
             assert(ret.second);
+            idVars.insert(make_pair(varInfo.id, &(*ret.first)));
             if (ret.first->parent)
             {
                 const_cast<FuncInfo*>(ret.first->parent)->vars.push_back(&*ret.first);

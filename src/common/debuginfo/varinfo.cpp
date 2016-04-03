@@ -12,6 +12,8 @@ namespace dbginfo
         size(size),
         stackOffset(stackOffset)
     {
+        static int globalId = 0;
+        id = globalId++;
     }
 
     bool VarInfo::operator<(const VarInfo& v) const
@@ -21,6 +23,7 @@ namespace dbginfo
 
     void VarInfo::save(std::ostream& out, const DebugContext& dbgCtxt) const
     {
+        utils::save(id, out);
         utils::save(type, out);
         utils::save(!parent ? -1 : parent->id, out);
         utils::save(name, out);
@@ -30,6 +33,7 @@ namespace dbginfo
 
     void VarInfo::load(std::istream& in, const DebugContext& dbgCtxt)
     {
+        id = utils::load<int>(in);
         type = utils::load<StorageType>(in);
         int funcId = utils::load<int>(in);
         if (funcId >= 0)

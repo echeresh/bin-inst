@@ -1,7 +1,7 @@
 #pragma once
-#include "common/offsetostream.h"
+#include "common/streamutils/offsetostream.h"
 
 namespace dwarf
 {
-    extern OffsetOstream dwarfLog;
+    extern streamutils::OffsetOstream dwarfLog;
 } //namespace dwarf

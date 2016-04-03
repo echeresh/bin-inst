@@ -18,6 +18,7 @@ double drand()
     return rand() * 1. / RAND_MAX;
 }
 
+extern "C"
 void mul0(int n, double* a, double* b, double* c)
 {
     for (int i = 0; i < n; i++)
@@ -31,6 +32,7 @@ void mul0(int n, double* a, double* b, double* c)
         }
 }
 
+extern "C"
 void mul1(int n, double* a, double* b, double* c)
 {
     for (int i = 0; i < n; i++)
@@ -45,6 +47,7 @@ void mul1(int n, double* a, double* b, double* c)
         }
 }
 
+extern "C"
 void mul2(int n, double* a, double* b, double* c)
 {
     for (int i = 0; i < n; i++)
@@ -56,6 +59,7 @@ void mul2(int n, double* a, double* b, double* c)
         }
 }
 
+extern "C"
 void mul3(int n, double* a, double* b, double* c)
 {
     for (int i = 0; i < n; i++)
@@ -111,5 +115,6 @@ int main(int argc, char** argv)
         }
     //test(*mfuncs[mix], n, a, b, c);
     mul0(n, a, b, c);
+    mul1(n, a, b, c);
     return 0;
 }

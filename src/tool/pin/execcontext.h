@@ -6,6 +6,7 @@
 #include <cassert>
 #include <sstream>
 #include <thread>
+#include "common/callstack.h"
 #include "common/debuginfo/debugcontext.h"
 #include "common/event/eventmanager.h"
 #include "common/utils.h"
@@ -14,14 +15,6 @@
 
 namespace pin
 {
-    struct FuncCall
-    {
-        const dbginfo::FuncInfo* funcInfo;
-        void* frameBase;
-
-        FuncCall(const dbginfo::FuncInfo* funcInfo, void* frameBase);
-    };
-
     struct MemoryObject
     {
         void* addr;
@@ -36,38 +29,23 @@ namespace pin
         bool operator<(const MemoryObject& o) const;
     };
 
-    struct CallStack
-    {
-        std::vector<FuncCall> calls;
-        ADDRINT lastCallInstruction = 0;
-
-        void addCall(const FuncCall& call);
-        MemoryObject findObject(void* addr, size_t size);
-        std::string str() const;
-        const FuncCall& top() const;
-        void pop();
-
-    };
-
     class HeapInfo
     {
         std::set<MemoryObject> objects;
 
     public:
-        void handleAlloc(void* addr, size_t size, const std::string& varName);
-        void handleFree(void* addr);
+        void handleAlloc(dbginfo::DebugContext& dbgCtxt, MemoryEvent& memoryEvent, const std::string& varName);
+        void handleFree(dbginfo::DebugContext& dbgCtxt, MemoryEvent& memoryEvent);
         MemoryObject findObject(void* addr, size_t size) const;
     };
 
     class ExecContext
     {
-        static const int MaxThreads = 64;
-
         const std::string binPath;
         dbginfo::DebugContext& dbgCtxt;
 
         HeapInfo heapInfo;
-        std::vector<CallStack> callStacks;
+        CallStackGlobal callStackGlobal;
 
         PinEventDumper eventDumper;
 
