@@ -31,8 +31,9 @@ public:
 
         if (keyMap.size() > maxSize)
         {
-            auto end = keyList.rend();
-            keyMap.erase(end->first);
+            auto it = keyList.end();
+            it--;
+            keyMap.erase(it->first);
             keyList.pop_back();
         }
     }

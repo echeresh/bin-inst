@@ -14,8 +14,8 @@ class SpatialLocality : public Locality
 
 public:
     SpatialLocality(size_t windowSize = DEFAULT_WINDOW_SIZE) :
-        window(windowSize),
-        stride(128)
+        stride(128),
+        window(windowSize)
     {
     }
 
@@ -23,7 +23,7 @@ public:
     {
         uintptr_t addr64bit = (uintptr_t)addr / 8;
         size_t minStride = SIZE_MAX;
-        for (int i = windowIndex, j = 0; j < window.size(); i = (i + 1) % window.size(), j++)
+        for (size_t i = windowIndex, j = 0; j < window.size(); i = (i + 1) % window.size(), j++)
         {
             size_t diff = abs(window[i] - addr64bit);
             if (diff < minStride)
@@ -36,14 +36,15 @@ public:
         {
             stride[minStride]++;
         }
-        window[windowIndex++] = addr64bit;
+        window[windowIndex] = addr64bit;
+        windowIndex = (windowIndex + 1) % window.size();
         accessCount++;
     }
 
     double getValue() const override
     {
         double value = 0;
-        for (int i = 0; i < stride.size(); i++)
+        for (size_t i = 0; i < stride.size(); i++)
         {
             value += stride[i] / (double)(i + 1);
         }

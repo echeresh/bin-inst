@@ -18,8 +18,10 @@ int main()
 
     QueryManager qm(eventManager);
     QueryContext qctxt;
-    qctxt.acceptFunc(debugContext.findFuncByName("mul1"));
+    qctxt.acceptFunc(debugContext.findFuncByName("mul0"));
     auto accMat = qm.buildAccessMatrix(qctxt);
+    auto localityInfo = qm.computeLocality(qctxt);
     cout << accMat.str() << endl;
+    cout << localityInfo.str() << endl;
     return 0;
 }

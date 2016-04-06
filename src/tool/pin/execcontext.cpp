@@ -40,7 +40,6 @@ namespace pin
         return addr < o.addr;
     }
 
-
     template <class Cont, class TKey>
     typename Cont::iterator lessFirst(Cont& c, const TKey& key)
     {
