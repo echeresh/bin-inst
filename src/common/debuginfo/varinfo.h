@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <string>
+#include "common/sourcelocation.h"
 #include "common/utils.h"
 #include "debuginfo.h"
 
@@ -14,14 +15,15 @@ namespace dbginfo
     {
         int id = -1;
         StorageType type;
-        const FuncInfo* parent = nullptr;
         std::string name;
         size_t size;
         ssize_t stackOffset;
+        SourceLocation srcLoc;
+        const FuncInfo* parent = nullptr;
 
         VarInfo() = default;
         VarInfo(StorageType type, const std::string& name, size_t size,
-                ssize_t stackOffset, const FuncInfo* parent = nullptr);
+                ssize_t stackOffset, const SourceLocation& srcLoc, const FuncInfo* parent = nullptr);
 
         //declare compare operator for storing in set
         bool operator<(const VarInfo& v) const;

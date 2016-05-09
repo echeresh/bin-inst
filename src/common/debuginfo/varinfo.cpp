@@ -5,12 +5,13 @@
 namespace dbginfo
 {
     VarInfo::VarInfo(StorageType type, const std::string& name, size_t size,
-                     ssize_t stackOffset, const FuncInfo* parent) :
+                     ssize_t stackOffset, const SourceLocation& srcLoc, const FuncInfo* parent) :
         type(type),
-        parent(parent),
         name(name),
         size(size),
-        stackOffset(stackOffset)
+        stackOffset(stackOffset),
+        srcLoc(srcLoc),
+        parent(parent)
     {
         static int globalId = 0;
         id = globalId++;
@@ -26,6 +27,7 @@ namespace dbginfo
         utils::save(id, out);
         utils::save(type, out);
         utils::save(!parent ? -1 : parent->id, out);
+        srcLoc.save(out);
         utils::save(name, out);
         utils::save(size, out);
         utils::save(stackOffset, out);
@@ -40,6 +42,7 @@ namespace dbginfo
         {
             parent = dbgCtxt.findFuncById(funcId);
         }
+        srcLoc.load(in);
         name = utils::load<std::string>(in);
         size = utils::load<size_t>(in);
         stackOffset = utils::load<ssize_t>(in);

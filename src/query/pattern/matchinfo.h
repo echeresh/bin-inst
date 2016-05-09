@@ -1,7 +1,7 @@
 #pragma once
 #include <cassert>
 #include <iostream>
-
+#include <sstream>
 #include "matchimpl.h"
 
 typedef uint8_t byte;
@@ -38,6 +38,13 @@ namespace pattern
         bool typeEquals(const MatchInfo& matchInfo) const
         {
             return matchImpl->equals(matchInfo.matchImpl);
+        }
+
+        std::string str() const
+        {
+            std::ostringstream oss;
+            oss << matchImpl->str();
+            return oss.str();
         }
     };
 } //namespace pattern

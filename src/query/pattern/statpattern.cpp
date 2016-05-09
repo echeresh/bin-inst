@@ -129,6 +129,7 @@ namespace pattern
 
     StatPattern::~StatPattern()
     {
+        return;
         std::vector<std::pair<size_t, StatMatchImpl*>> stats;
         for (auto& e : matchesPool)
         {

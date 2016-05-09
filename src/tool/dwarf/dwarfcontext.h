@@ -2,6 +2,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include "common/sourcelocation.h"
 #include "location.h"
 #include "debuginfo/debugcontext.h"
 
@@ -36,10 +37,11 @@ namespace dwarf
         std::string name;
         size_t size;
         LocInfo location;
+        SourceLocation srcLoc;
 
         VarInfo() = default;
         VarInfo(int id, StorageType type, FuncInfo* parent, const std::string& name, size_t size,
-                const LocInfo& location);
+                const LocInfo& location, const SourceLocation& srcLoc);
     };
 
     class DwarfContext

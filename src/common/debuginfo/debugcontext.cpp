@@ -8,14 +8,33 @@ namespace dbginfo
 {
     DebugContext::DebugContext(DebugContext&& d) :
         funcs(std::move(d.funcs)),
-        vars(std::move(d.vars))
+        vars(std::move(d.vars)),
+        instBindings(std::move(d.instBindings))
     {
+        for (auto& e: funcs)
+        {
+            idFuncs[e.second.id] = &e.second;
+        }
+        for (auto& v: vars)
+        {
+            idVars[v.id] = &v;
+        }
     }
 
     DebugContext& DebugContext::operator=(DebugContext&& d)
     {
         funcs = std::move(d.funcs);
         vars = std::move(d.vars);
+        instBindings = std::move(d.instBindings);
+
+        for (auto& e: funcs)
+        {
+            idFuncs[e.second.id] = &e.second;
+        }
+        for (auto& v: vars)
+        {
+            idVars[v.id] = &v;
+        }
         return *this;
     }
 
@@ -33,7 +52,7 @@ namespace dbginfo
 
     const FuncInfo* DebugContext::addFunc(const FuncInfo& funcInfo)
     {
-        cout << "ADDED: " << funcInfo.name << endl;
+        cout << "ADDED FUNC: " << funcInfo.name << " " << funcInfo.id << endl;
         auto ret = funcs.insert(make_pair(funcInfo.name, funcInfo));
         assert(ret.second);
         idFuncs.insert(make_pair(funcInfo.id, &ret.first->second));
@@ -42,6 +61,7 @@ namespace dbginfo
 
     const VarInfo* DebugContext::addVar(const VarInfo& varInfo)
     {
+        cout << "ADDED VAR: " << varInfo.name << " -> " << varInfo.srcLoc.str() << endl;
         auto ret = vars.insert(varInfo);
         if (varInfo.parent)
         {

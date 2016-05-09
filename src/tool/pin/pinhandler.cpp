@@ -98,7 +98,7 @@ namespace pin
     static void callInstBefore(PinHandler* execHandler, THREADID threadId, ADDRINT instAddr, UINT32 rtnId)
     {
         //cout << "routineCallAnyBefore " << execHandler->routines[rtnId].name << endl;
-        execHandler->handleCallInst(instAddr, threadId);
+        execHandler->handleCallInst(instAddr, threadId, rtnId);
     }
 
     static void callInstAfter(PinHandler* execHandler, THREADID threadId, ADDRINT instAddr, UINT32 rtnId)
@@ -289,10 +289,10 @@ namespace pin
         }
     }
 
-    void PinHandler::handleCallInst(ADDRINT instAddr, THREADID threadId)
+    void PinHandler::handleCallInst(ADDRINT instAddr, THREADID threadId, int routineId)
     {
         Locker locker(&lock, threadId);
-        Event e(EventType::CallInst, threadId, -1, nullptr, instAddr);
+        Event e(EventType::CallInst, threadId, routineId, nullptr, instAddr);
         execCtxt.addEvent(e);
     }
 

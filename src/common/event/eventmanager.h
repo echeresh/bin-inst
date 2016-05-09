@@ -101,7 +101,7 @@ public:
         }
         int begIndex = (curIndex / EVENT_CHUNK_SIZE ) * EVENT_CHUNK_SIZE;
         int eventCount = std::min(EVENT_CHUNK_SIZE, totalEvents - begIndex);
-        std::ofstream out(eventPath, std::ios::binary);
+        std::fstream out(eventPath, std::ios::binary | std::ios::in | std::ios::out);
         out.seekp(begIndex * sizeof(Event), out.beg);
         out.write((char*)&preloadEvents[0], eventCount * sizeof(Event));
     }

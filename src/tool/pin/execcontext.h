@@ -9,6 +9,7 @@
 #include "common/callstack.h"
 #include "common/debuginfo/debugcontext.h"
 #include "common/event/eventmanager.h"
+#include "common/sourcelocation.h"
 #include "common/utils.h"
 #include "pin.H"
 #include "pineventdumper.h"
@@ -34,9 +35,9 @@ namespace pin
         std::set<MemoryObject> objects;
 
     public:
-        void handleAlloc(dbginfo::DebugContext& dbgCtxt, MemoryEvent& memoryEvent, const std::string& varName);
+        void handleAlloc(dbginfo::DebugContext& dbgCtxt, MemoryEvent& memoryEvent, const SourceLocation& srcLoc);
         void handleFree(dbginfo::DebugContext& dbgCtxt, MemoryEvent& memoryEvent);
-        MemoryObject findObject(void* addr, size_t size) const;
+        MemoryObject findObject(const MemoryEvent& memoryEvent) const;
     };
 
     class ExecContext
@@ -48,17 +49,17 @@ namespace pin
         CallStackGlobal callStackGlobal;
 
         PinEventDumper eventDumper;
+        bool profilingEnabled = false;
+        bool heapSupportEnabled = false;
 
-        MemoryObject findNonStackObject(void* addr, size_t size);
-        MemoryObject findStackObject(void* addr, size_t size);
-        std::string getVarNameFromFile(const SourceLocation& sourceLoc) const;
-        SourceLocation getSourceLocation(ADDRINT inst) const;
+        MemoryObject findNonStackObject(const MemoryEvent& memoryEvent);
+        MemoryObject findStackObject(const MemoryEvent& memoryEvent);
 
     public:
         ExecContext(const std::string& binPath, dbginfo::DebugContext& dbgCtxt);
         int getRoutineId(RTN rtn);
         void addEvent(const Event& event);
-        MemoryObject findObject(void* addr, int size);
+        MemoryObject findObject(const MemoryEvent& memoryEvent);
         EventManager dumpEvents();
         void saveMemoryAccesses() const;
     };

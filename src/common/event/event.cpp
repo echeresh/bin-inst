@@ -29,7 +29,9 @@ std::string to_string(EventType type)
 std::string MemoryEvent::str(const EventManager& eventManager) const
 {
     std::ostringstream oss;
-    oss << "thread: " << threadId << "; addr: " << addr
+    auto* varInfo = eventManager.getDebugContext().findVarById(varId);
+    oss << "var: " << (varInfo ? varInfo->name : std::string("nullptr")) << " [" << varId << "]"
+        << "; thread: " << threadId << "; addr: " << addr
         << "; size: " << size << "; inst: " << (void*)instAddr << "; t: " << t;
     return oss.str();
 }
@@ -39,7 +41,9 @@ std::string RoutineEvent::str(const EventManager& eventManager) const
     std::ostringstream oss;
     auto* funcInfo = eventManager.getDebugContext().findFuncById(routineId);
     if (funcInfo)
+    {
         oss << funcInfo->name << "; ";
+    }
     oss << "thread: " << threadId << "; inst: " << (void*)instAddr << "; t: " << t;
     return oss.str();
 }

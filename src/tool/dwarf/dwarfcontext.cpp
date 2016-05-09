@@ -24,13 +24,14 @@ namespace dwarf
     //------------------------------------------------------------------------------
 
     VarInfo::VarInfo(int id, StorageType type, FuncInfo* parent, const std::string& name, size_t size,
-                     const LocInfo& location) :
+                     const LocInfo& location, const SourceLocation& srcLoc) :
         id(id),
         type(type),
         parent(parent),
         name(name),
         size(size),
-        location(location)
+        location(location),
+        srcLoc(srcLoc)
     {
         dwarfLog << "VarInfo: " << name << " " << size << std::endl;
     }
@@ -78,13 +79,19 @@ namespace dwarf
             auto& f = fe.second;
             std::string name = f.linkageName.empty() ? f.name : f.linkageName;
             if (name == DwarfEmptyName)
+            {
                 continue;
+            }
             auto& entries = f.location.entries;
             if (entries.empty())
+            {
                 continue;
+            }
             auto& entry = entries.front();
             if (entry.reg != LocSource::RSP)
+            {
                 continue;
+            }
             ssize_t loc = entry.off;
             auto* pFuncInfo = ctxt.addFunc(dbginfo::FuncInfo(name, loc));
             for (auto& pv : f.vars)
@@ -101,6 +108,7 @@ namespace dwarf
                 LocEntry entry;
                 bool found = false;
                 for (auto& e : entries)
+                {
                     if (e.reg == LocSource::FrameBase)
                     {
                         entry = e;
@@ -117,9 +125,12 @@ namespace dwarf
                         found = true;
                         break;
                     }
+                }
                 if (!found)
+                {
                     continue;
-                dbginfo::VarInfo var(type, v.name, v.size, entry.off, pFuncInfo);
+                }
+                dbginfo::VarInfo var(type, v.name, v.size, entry.off, v.srcLoc, pFuncInfo);
                 ctxt.addVar(var);
             }
         }
@@ -136,7 +147,7 @@ namespace dwarf
                     continue;
                 }
                 auto& entry = entries.front();
-                dbginfo::VarInfo var(dbginfo::StorageType::Static, v.name, v.size, entry.off);
+                dbginfo::VarInfo var(dbginfo::StorageType::Static, v.name, v.size, entry.off, v.srcLoc);
                 ctxt.addVar(var);
             }
         }

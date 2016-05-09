@@ -66,6 +66,7 @@ VOID Fini(INT32 code, VOID *v)
     
     delete parser;
     delete pinHandler;
+    cout << "FINI" << endl;
 }
 
 int main(int argc, char* argv[])

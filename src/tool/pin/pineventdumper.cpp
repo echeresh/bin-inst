@@ -30,7 +30,6 @@ namespace pin
             PIN_SemaphoreWait(&eventDumper->filled);
             //std::cout << "thread: clear filled" << std::endl;
             PIN_SemaphoreClear(&eventDumper->filled);
-
             std::ofstream out(eventDumper->eventPath, ios::app | ios::binary);
             assert(out.good());
             out.write((char*)&(*eventDumper->pEventsSave)[0], eventDumper->pEventsSave->size() * sizeof(Event));

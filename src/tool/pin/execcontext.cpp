@@ -2,8 +2,56 @@
 #include "execcontext.h"
 using namespace std;
 
+VOID Fini(INT32 code, VOID *v);
+
 namespace pin
 {
+    SourceLocation getSourceLocation(ADDRINT inst)
+    {
+        int column;
+        int line;
+        string fileName;
+        PIN_LockClient();
+        PIN_GetSourceLocation(inst, &column, &line, &fileName);
+        PIN_UnlockClient();
+        return SourceLocation(fileName, line);
+    }
+
+    std::string getVarNameFromFile(const SourceLocation& sourceLoc)
+    {
+        if (sourceLoc.line == 0 || sourceLoc.fileName.empty())
+        {
+            return "";
+        }
+        ifstream in(sourceLoc.fileName);
+        string line;
+        for (int i = 0; i < sourceLoc.line; i++)
+        {
+            getline(in, line);
+            if (in.eof())
+                return "";
+        }
+        if (line.find("alloc") == string::npos)
+            return "";
+        auto pos = line.find("=");
+        assert(pos != string::npos);
+
+        pos--;
+        while (isspace(line[pos]))
+            pos--;
+
+        string var;
+        for (int i = pos; i >= 0; i--)
+        {
+            char c = line[i];
+            if (!isalnum(c) && c != '_')
+                break;
+            var = line[i] + var ;
+        }
+        assert(!var.empty());
+        cout << "var: " << var << endl;
+        return var;
+    }
     //------------------------------------------------------------------------------
     //MemoryObject
     //------------------------------------------------------------------------------
@@ -56,12 +104,14 @@ namespace pin
     //HeapInfo
     //------------------------------------------------------------------------------
 
-    void HeapInfo::handleAlloc(dbginfo::DebugContext& dbgCtxt, MemoryEvent& memoryEvent, const std::string& varName)
+    void HeapInfo::handleAlloc(dbginfo::DebugContext& dbgCtxt, MemoryEvent& memoryEvent, const SourceLocation& srcLoc)
     {
         static int id = 0;
+        //std::string varName = getVarNameFromFile(srcLoc);
+        std::cout << "alloc __dyn_#" + std::to_string(id) << " " << memoryEvent.addr << std::endl;
         auto* varInfo = dbgCtxt.addVar(dbginfo::VarInfo(dbginfo::StorageType::Dynamic,
-                                                        varName + "#" + std::to_string(id++),
-                                                        memoryEvent.size, (ssize_t)memoryEvent.addr));
+                                                        "__dyn_" + std::to_string(id++),
+                                                        memoryEvent.size, (ssize_t)memoryEvent.addr, srcLoc));
         memoryEvent.varId = varInfo->id;
         auto ret = objects.insert(MemoryObject(memoryEvent.addr, memoryEvent.size, varInfo));
         assert(ret.second);
@@ -74,11 +124,14 @@ namespace pin
         {
             return;
         }
+        std::cout << "free " << it->varInfo->name << " " << memoryEvent.addr << std::endl;
         objects.erase(it);
     }
 
-    MemoryObject HeapInfo::findObject(void* addr, size_t size) const
+    MemoryObject HeapInfo::findObject(const MemoryEvent& memoryEvent) const
     {
+        size_t size = memoryEvent.size;
+        void* addr = memoryEvent.addr;
         auto it = lessFirst(objects, addr);
         if (it == objects.end())
         {
@@ -87,7 +140,16 @@ namespace pin
 
         if (it->lo() <= addr && addr < it->hi())
         {
-            assert((char*)addr + size <= it->hi());
+            if (!((char*)addr + size <= it->hi()))
+            {
+                auto sourceLoc = getSourceLocation(memoryEvent.instAddr);
+                std::cout << sourceLoc.str() << std::endl;
+                std::cout << "assert 131: " << std::endl;
+                std::cout << addr << std::endl;
+                std::cout << size << std::endl;
+                std::cout << it->lo() << std::endl;
+                std::cout << it->hi() << std::endl;
+            }
             return *it;
         }
         return MemoryObject();
@@ -105,12 +167,17 @@ namespace pin
     {
     }
 
-    MemoryObject ExecContext::findNonStackObject(void* addr, size_t size)
+    MemoryObject ExecContext::findNonStackObject(const MemoryEvent& memoryEvent)
     {
-        auto mo = heapInfo.findObject(addr, size);
-        if (!mo.isEmpty())
+        size_t size = memoryEvent.size;
+        void* addr = memoryEvent.addr;
+        if (heapSupportEnabled)
         {
-            return mo;
+            auto mo = heapInfo.findObject(memoryEvent);
+            if (!mo.isEmpty())
+            {
+                return mo;
+            }
         }
         auto* varInfo = dbgCtxt.findVarByAddress(addr);
         if (varInfo)
@@ -120,12 +187,15 @@ namespace pin
         return MemoryObject();
     }
 
-    MemoryObject ExecContext::findStackObject(void* addr, size_t size)
+    MemoryObject ExecContext::findStackObject(const MemoryEvent& memoryEvent)
     {
+        size_t size = memoryEvent.size;
+        void* addr = memoryEvent.addr;
         int i = 0;
         {
             {
                 auto& calls = callStackGlobal.getCalls(i);
+                //cout << "findStackObject " << calls.size() << endl;
                 for (int i = calls.size() - 1; i >= 0; i--)
                 {
                     auto& call = calls[i];
@@ -137,7 +207,15 @@ namespace pin
                             if (varAddr <= addr && addr <= varAddr + var->size - 1)
                             {
                                 //cout << "found object: " << var->name << endl;
-                                assert((char*)addr + size <= varAddr + var->size);
+                                /*if (!((char*)addr + size <= varAddr + var->size))
+                                {
+                                    std::cout << var->name << std::endl;
+                                    std::cout << addr << std::endl;
+                                    std::cout << size << std::endl;
+                                    std::cout << varAddr << std::endl;
+                                    std::cout << var->size << std::endl;
+                                }*/
+                                //assert((char*)addr + size <= varAddr + var->size);
                                 return MemoryObject(varAddr, var->size, var);
                             }
                         }
@@ -148,81 +226,58 @@ namespace pin
         return MemoryObject();
     }
 
-    std::string ExecContext::getVarNameFromFile(const SourceLocation& sourceLoc) const
-    {
-        if (sourceLoc.line == 0 || sourceLoc.fileName.empty())
-        {
-            return "";
-        }
-        ifstream in(sourceLoc.fileName);
-        string line;
-        for (int i = 0; i < sourceLoc.line; i++)
-        {
-            getline(in, line);
-            if (in.eof())
-                return "";
-        }
-        if (line.find("alloc") == string::npos)
-            return "";
-        auto pos = line.find("=");
-        assert(pos != string::npos);
-
-        pos--;
-        while (isspace(line[pos]))
-            pos--;
-
-        string var;
-        for (int i = pos; i >= 0; i--)
-        {
-            char c = line[i];
-            if (!isalnum(c) && c != '_')
-                break;
-            var = line[i] + var ;
-        }
-        assert(!var.empty());
-        cout << "var: " << var << endl;
-        return var;
-    }
-
-    SourceLocation ExecContext::getSourceLocation(ADDRINT inst) const
-    {
-        int column;
-        int line;
-        string fileName;
-        PIN_LockClient();
-        PIN_GetSourceLocation(inst, &column, &line, &fileName);
-        PIN_UnlockClient();
-        return SourceLocation(fileName, line);
-    }
-
     int ExecContext::getRoutineId(RTN rtn)
     {
         string name = RTN_Name(rtn);
         auto* func = dbgCtxt.findFuncByName(name);
         if (!func)
         {
-            cout << "--------> " << name << endl;
+            cout << "--------> " << name << " -1" << endl;
             return -1;
         }
         assert(func);
+        cout << "--------> " << name << " " << func->id << endl;
         return func->id;
     }
 
     void ExecContext::addEvent(const Event& event)
     {
-        eventDumper.addEvent(event);
+        if (event.type == EventType::Call || event.type == EventType::Ret)
+        {
+            int routineId = event.routineEvent.routineId;
+            auto* funcInfo = dbgCtxt.findFuncById(routineId);
+            if (funcInfo && funcInfo->name == "main")
+            {
+                if (event.type == EventType::Call)
+                {
+                    //std::cout << "PROFILING STARTED" << std::endl;
+                    profilingEnabled = true;
+                }
+                else if (event.type == EventType::Ret)
+                {
+                    //dirty hack
+                    eventDumper.addEvent(event);
+                    Fini(0, nullptr);
+                    exit(0);
+                }
+            }
+        }
+        if (profilingEnabled)
+        {
+            eventDumper.addEvent(event);
+        }
     }
 
-    MemoryObject ExecContext::findObject(void* addr, int size)
+    MemoryObject ExecContext::findObject(const MemoryEvent& memoryEvent)
     {
         MemoryObject mo;
-        if (addr > (void*)0x70000000000)
+        if (memoryEvent.addr > (void*)0x70000000000)
         {
-            mo = findStackObject(addr, size);
+            mo = findStackObject(memoryEvent);
         }
         else
         {
-            mo = findNonStackObject(addr, size);
+            mo = findNonStackObject(memoryEvent);
         }
         return mo;
     }
@@ -237,44 +292,51 @@ namespace pin
         while (em.hasNext())
         {
             processed++;
-            if (processed % 10 == 0)
+            if (processed % 10000 == 0)
             {
-                std::cout << "completed: " << processed * 100. / em.size() << "%" << std::endl;
+                std::cout << "completed: " << processed * 100. / em.size() << "%" << " " << em.size() << std::endl;
             }
 
             Event& e = em.next();
+            //cout << e.str(em) << endl;
             switch (e.type)
             {
                 case EventType::Alloc:
                 {
-                    auto sourceLoc = getSourceLocation(callInstructions[e.memoryEvent.threadId]);
-                    string varName = getVarNameFromFile(sourceLoc);
-                    heapInfo.handleAlloc(dbgCtxt, e.memoryEvent, varName);
+                    if (heapSupportEnabled)
+                    {
+                        auto sourceLoc = getSourceLocation(callInstructions[e.memoryEvent.threadId]);
+                        heapInfo.handleAlloc(dbgCtxt, e.memoryEvent, sourceLoc);
+                    }
                     break;
                 }
                 case EventType::Free:
                 {
-                    heapInfo.handleFree(dbgCtxt, e.memoryEvent);
+                    if (heapSupportEnabled)
+                    {
+                        heapInfo.handleFree(dbgCtxt, e.memoryEvent);
+                    }
                     break;
                 }
                 //handle call instruction to save address of call instruction calling malloc
                 case EventType::CallInst:
                 {
-                    callInstructions[e.routineEvent.threadId] = e.routineEvent.instAddr;
+                    auto& re = e.routineEvent;
+                    callInstructions[e.routineEvent.threadId] = re.instAddr;
                     break;
                 }
-                /*case EventType::Call:
+                case EventType::Call:
                 case EventType::Ret:
                 {
                     auto* funcInfo = dbgCtxt.findFuncById(e.routineEvent.routineId);
+                    //cout << "ROUTINEID: " << e.routineEvent.routineId << endl;
                     if (!funcInfo)
                     {
                         break;
                     }
-
+                    //cout << "NAME: " << funcInfo->name << endl;
                     void* frameBase = (char*)e.routineEvent.stackPointerRegister + funcInfo->stackOffset;
                     FuncCall funcCall(funcInfo, frameBase);
-
                     if (e.type == EventType::Call)
                     {
                         callStackGlobal.push(e.routineEvent.threadId, funcCall);
@@ -284,12 +346,12 @@ namespace pin
                         callStackGlobal.pop(e.routineEvent.threadId, funcCall);
                     }
                     break;
-                }*/
+                }
                 case EventType::Read:
                 case EventType::Write:
                 {
                     auto& memoryEvent = e.memoryEvent;
-                    auto mo = findObject(memoryEvent.addr, memoryEvent.size);
+                    auto mo = findObject(memoryEvent);
                     if (!mo.isEmpty())
                     {
                         memoryEvent.varId = mo.varInfo->id;

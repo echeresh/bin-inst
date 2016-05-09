@@ -34,7 +34,7 @@ namespace pin
         void instrumentInstruction(INS ins);
 
         void instrumentRoutineExternal(RTN rtn);
-        void handleCallInst(ADDRINT instAddr, THREADID threadId);
+        void handleCallInst(ADDRINT instAddr, THREADID threadId, int routineId);
 
         EventManager dumpEvents();
     };

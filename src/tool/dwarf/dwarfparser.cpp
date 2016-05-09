@@ -17,6 +17,7 @@ namespace dwarf
         Dwarf_Die lastFuncDie = nullptr;
         Dwarf_Unsigned cuOffset = 0;
         Dwarf_Signed lang;
+        const char* cuName;
     };
 
     //------------------------------------------------------------------------------
@@ -157,12 +158,16 @@ namespace dwarf
             //dwarfLog << "size = " << size << endl;
             if (size != 0)
             {
+                Dwarf_Unsigned declLine = -1;
+                auto declLineAttr = getAttr(die, DW_AT_decl_line);
+                Dwarf_Error error;
+                dwarf_formudata(declLineAttr, &declLine, &error);
                 if (walkInfo.storageType == StorageType::Static)
                 {
                     Dwarf_Off id;
                     DWARF_CHECK(dwarf_dieoffset(die, &id, nullptr));
                     dctx.addVar(VarInfo(id, StorageType::Static, nullptr, getDieName(die),
-                                        size, LocInfo(dbg, die)));
+                                        size, LocInfo(dbg, die), SourceLocation(walkInfo.cuName, declLine)));
                 }
                 else
                 {
@@ -172,7 +177,7 @@ namespace dwarf
                     auto* func = dctx.getFunc(id);
                     DWARF_CHECK(dwarf_dieoffset(die, &id, nullptr));
                     dctx.addVar(VarInfo(id, StorageType::Auto, func, getDieName(die),
-                                        size, LocInfo(dbg, die)));
+                                        size, LocInfo(dbg, die), SourceLocation(walkInfo.cuName, declLine)));
                 }
             }
         }
@@ -232,6 +237,9 @@ namespace dwarf
         dwarf_whatform(attr, &retForm, nullptr);
         assert(retForm == DW_FORM_data1);
         DWARF_CHECK(dwarf_formsdata(attr, &walkInfo.lang, nullptr));
+        char* cuName;
+        DWARF_CHECK(dwarf_diename(cuDie, &cuName, nullptr));
+        walkInfo.cuName = cuName;
         walkTree(cuDie, walkInfo);
     }
 

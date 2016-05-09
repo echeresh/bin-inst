@@ -16,42 +16,6 @@ enum class EventType
     Free
 };
 
-struct SourceLocation
-{
-    std::string fileName;
-    int line;
-
-    SourceLocation() = default;
-    SourceLocation(const std::string& fileName, int line):
-        fileName(fileName),
-        line(line)
-    {
-    }
-
-    operator bool() const
-    {
-        return !fileName.empty();
-    }
-
-    bool operator==(const SourceLocation& sourceLocation) const
-    {
-        return fileName == sourceLocation.fileName &&
-               line == sourceLocation.line;
-    }
-
-    void save(std::ostream& out) const
-    {
-        utils::save(fileName, out);
-        utils::save(line, out);
-    }
-
-    void load(std::istream& in)
-    {
-        fileName = utils::load<std::string>(in);
-        line = utils::load<int>(in);
-    }
-};
-
 std::string to_string(EventType type);
 
 struct EventManager;

@@ -11,6 +11,7 @@ struct AccessMatrixEntry
 {
     const dbginfo::VarInfo* varInfo;
     std::map<int, AccessType> threadAccessTypes;
+    int accessed = 0;
 
     std::string accessTypeStr(int ithr) const
     {
@@ -31,6 +32,18 @@ struct AccessMatrixEntry
             return "W";
         }
         return "-";
+    }
+
+    void merge(const AccessMatrixEntry& ame)
+    {
+        assert(varInfo->name == ame.varInfo->name &&
+               varInfo->srcLoc == ame.varInfo->srcLoc);
+        accessed += ame.accessed;
+        for (auto& e: ame.threadAccessTypes)
+        {
+            int at = (int)threadAccessTypes[e.first];
+            threadAccessTypes[e.first] = (AccessType)(at | (int)e.second);
+        }
     }
 };
 
@@ -65,8 +78,10 @@ public:
                 std::cout << varInfo;
             }
         }
+        entries[me.varId].accessed++;
         threads.insert(me.threadId);
         auto& t = entries[me.varId].threadAccessTypes[me.threadId];
+
         switch (event.type)
         {
             case EventType::Read:
@@ -80,12 +95,41 @@ public:
         }
     }
 
+    void merge()
+    {
+        std::map<std::string, std::vector<std::map<int, AccessMatrixEntry>::iterator>> repeating;
+        for (auto it = entries.begin(); it != entries.end(); it++)
+        {
+            //ensure we known exact value of line
+            if (it->second.varInfo->srcLoc.line == -1)
+            {
+                continue;
+            }
+            std::string tag = it->second.varInfo->name + it->second.varInfo->srcLoc.str();
+            repeating[tag].push_back(it);
+        }
+        for (auto& e: repeating)
+        {
+            if (e.second.size() > 1)
+            {
+                auto first = e.second.front()->second;
+                for (size_t i = 1; i < e.second.size(); i++)
+                {
+                    auto it = e.second[i];
+                    first.merge(it->second);
+                    entries.erase(it);
+                }
+            }
+        }
+    }
+
     std::string str() const
     {
         streamutils::Table table;
         table.addColumn("File");
         table.addColumn("Variable name");
         table.addColumn("Size");
+        table.addColumn("Accessed");
         for (auto ithr: threads)
         {
             table.addColumn(std::string("thread #") + std::to_string(ithr));
@@ -93,9 +137,10 @@ public:
         for (auto& e: entries)
         {
             std::vector<std::string> row;
-            row.push_back("file");
+            row.push_back(e.second.varInfo->srcLoc.str());
             row.push_back(e.second.varInfo->name);
             row.push_back(std::to_string(e.second.varInfo->size));
+            row.push_back(std::to_string(e.second.accessed));
             for (auto ithr: threads)
             {
                 row.push_back(e.second.accessTypeStr(ithr));

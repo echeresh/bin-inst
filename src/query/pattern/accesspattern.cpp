@@ -1,5 +1,5 @@
 #include <cassert>
-
+#include <sstream>
 #include "accesspattern.h"
 
 namespace pattern
@@ -30,6 +30,7 @@ namespace pattern
 
     bool AccessPattern::process(const Access& a)
     {
+        processed++;
         if (isFull())
         {
             pop_front();
@@ -38,12 +39,13 @@ namespace pattern
 
         if (!isFull())
         {
-            return nullptr;
+            return false;
         }
 
         auto* matchImpl = match();
         if (matchImpl)
         {
+            matched++;
             auto& first = accesses.front();
             auto& last = accesses.back();
             matches.push_back(MatchInfo(matchImpl, first.addr, last.addr));
@@ -55,7 +57,9 @@ namespace pattern
     void AccessPattern::mergeMatches()
     {
         if (matches.size() <= 1)
+        {
             return;
+        }
 
         auto& prev = matches[matches.size() - 2];
         auto& cur = matches.back();
@@ -69,5 +73,12 @@ namespace pattern
     std::vector<MatchInfo> AccessPattern::getMatches() const
     {
         return matches;
+    }
+
+    std::string AccessPattern::str() const
+    {
+        std::ostringstream oss;
+        oss << "[matched " << matched << "/" << processed << "]";
+        return oss.str();
     }
 }

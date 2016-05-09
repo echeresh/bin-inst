@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cassert>
 #include <cstdlib>
 #include <cmath>
 #include <vector>
@@ -101,12 +102,14 @@ int main(int argc, char** argv)
     const int n = stoi(argv[1]);
     const int mix = stoi(argv[2]);
     mul mfuncs[4] = { &mul0, &mul1, &mul2, &mul3};
-    //double a[n*n];
-    //double b[n*n];
-    //double c[n*n] = { 0 };
-    double* a = (double*)malloc(sizeof(double)*n*n);
-    double* b = (double*)malloc(sizeof(double)*n*n);
-    double* c = (double*)calloc(n*n, sizeof(double));
+    const int N = 16;
+    assert(n == N);
+    double a[N*N];
+    double b[N*N];
+    double c[N*N] = { 0 };
+    //double* a = (double*)malloc(sizeof(double)*n*n);
+    //double* b = (double*)malloc(sizeof(double)*n*n);
+    //double* c = (double*)malloc(n*n*sizeof(double));
     for (int i = 0; i < n; i++)
         for (int j = 0; j < n; j++)
         {
@@ -115,6 +118,6 @@ int main(int argc, char** argv)
         }
     //test(*mfuncs[mix], n, a, b, c);
     mul0(n, a, b, c);
-    mul1(n, a, b, c);
+    //mul1(n, a, b, c);
     return 0;
 }

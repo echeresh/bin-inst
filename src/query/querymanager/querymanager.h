@@ -1,6 +1,8 @@
 #pragma once
+#include <cassert>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include "accessmatrix.h"
 #include "common/callstack.h"
 #include "common/debuginfo/debugcontext.h"
@@ -9,21 +11,27 @@
 #include "query/locality/localityinfo.h"
 #include "query/locality/spatiallocality.h"
 #include "query/locality/temporallocality.h"
+#include "query/pattern/patternanalyzer.h"
+#include "query/pattern/patterninfo.h"
 #include "querycontext.h"
 
 class QueryManager
 {
     EventManager& eventManager;
+    const dbginfo::DebugContext& debugContext;
+    const QueryContext& queryContext;
+    std::map<int, pattern::PatternAnalyzer> varAnalyzers;
 
 public:
-    QueryManager(EventManager& eventManager):
-        eventManager(eventManager)
+    QueryManager(EventManager& eventManager, const QueryContext& queryContext):
+        eventManager(eventManager),
+        debugContext(eventManager.getDebugContext()),
+        queryContext(queryContext)
     {
     }
 
-    LocalityInfo computeLocality(const QueryContext& queryContext)
+    LocalityInfo getLocalities()
     {
-        auto& debugContext = eventManager.getDebugContext();
         AccessMatrix accessMatrix(eventManager);
         eventManager.reset();
         SpatialLocality spatialLocality;
@@ -35,22 +43,25 @@ public:
             {
                 if (e.type == EventType::Read || e.type == EventType::Write)
                 {
-                    spatialLocality.add(e.memoryEvent.addr);
-                    temporalLocality.add(e.memoryEvent.addr);
+                    if (e.memoryEvent.varId >= 0)
+                    {
+                        spatialLocality.add(e.memoryEvent.addr);
+                        temporalLocality.add(e.memoryEvent.addr);
+                    }
                 }
             }
         }
         return LocalityInfo(spatialLocality.getValue(), temporalLocality.getValue());
     }
 
-    AccessMatrix buildAccessMatrix(const QueryContext& queryContext)
+    AccessMatrix getAccessMatrix()
     {
-        auto& debugContext = eventManager.getDebugContext();
         AccessMatrix accessMatrix(eventManager);
         eventManager.reset();
         while (eventManager.hasNext())
         {
             Event& e = eventManager.next();
+            //std::cout << "EVENT: " << e.str(eventManager) << std::endl;
             if (queryContext.accept(e, eventManager.topFuncInfo(e.getThreadId())))
             {
                 if (e.type == EventType::Read || e.type == EventType::Write)
@@ -59,6 +70,39 @@ public:
                 }
             }
         }
+        accessMatrix.merge();
         return accessMatrix;
+    }
+
+    pattern::PatternInfo getAccessPatterns()
+    {
+        varAnalyzers.clear();
+        pattern::PatternInfo patternInfo(debugContext);
+        eventManager.reset();
+        while (eventManager.hasNext())
+        {
+            Event& e = eventManager.next();
+            if (queryContext.accept(e, eventManager.topFuncInfo(e.getThreadId())))
+            {
+                if (e.type == EventType::Read || e.type == EventType::Write)
+                {
+                    auto& me = e.memoryEvent;
+                    if (me.varId >= 0)
+                    {
+                        varAnalyzers[me.varId].pushAccess(e.toAccess());
+                    }
+                }
+            }
+        }
+
+        for (auto& e: varAnalyzers)
+        {
+            int varId = e.first;
+            auto* varInfo = debugContext.findVarById(varId);
+            assert(varInfo);
+            std::cout << varInfo->name << " : " << e.second.str() << std::endl;
+            patternInfo.addMatches(varId, varAnalyzers[varId].getMatches());
+        }
+        return patternInfo;
     }
 };

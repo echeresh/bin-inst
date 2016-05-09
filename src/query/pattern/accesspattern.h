@@ -11,6 +11,8 @@ namespace pattern
 {
     class AccessPattern
     {
+        int matched = 0;
+        int processed = 0;
         size_t windowSize;
         std::vector<MatchInfo> matches;
 
@@ -27,5 +29,6 @@ namespace pattern
         bool process(const Access& a);
         std::vector<MatchInfo> getMatches() const;
         virtual MatchImpl* match() = 0;
+        std::string str() const;
     };
 }
