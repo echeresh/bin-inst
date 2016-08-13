@@ -52,7 +52,7 @@ namespace dbginfo
 
     const FuncInfo* DebugContext::addFunc(const FuncInfo& funcInfo)
     {
-        cout << "ADDED FUNC: " << funcInfo.name << " " << funcInfo.id << endl;
+        //cout << "ADDED FUNC: " << funcInfo.name << " " << funcInfo.id << endl;
         auto ret = funcs.insert(make_pair(funcInfo.name, funcInfo));
         assert(ret.second);
         idFuncs.insert(make_pair(funcInfo.id, &ret.first->second));
@@ -61,7 +61,7 @@ namespace dbginfo
 
     const VarInfo* DebugContext::addVar(const VarInfo& varInfo)
     {
-        cout << "ADDED VAR: " << varInfo.name << " -> " << varInfo.srcLoc.str() << endl;
+        //cout << "ADDED VAR: " << varInfo.name << " -> " << varInfo.srcLoc.str() << endl;
         auto ret = vars.insert(varInfo);
         if (varInfo.parent)
         {

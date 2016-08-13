@@ -13,6 +13,8 @@ namespace pattern
         MatchImpl* matchImpl;
         byte* beginAddr;
         byte* endAddr;
+        size_t sz = 0;
+        int index = -1;
 
         friend std::ostream& operator <<(std::ostream& out, const MatchInfo& matchInfo);
 
@@ -20,7 +22,8 @@ namespace pattern
         MatchInfo(MatchImpl* matchImpl, byte* beginAddr, byte* endAddr) :
             matchImpl(matchImpl),
             beginAddr(beginAddr),
-            endAddr(endAddr)
+            endAddr(endAddr),
+            sz(1)
         {
         }
 
@@ -28,6 +31,7 @@ namespace pattern
         {
             assert(isMergable(matchInfo));
             endAddr = matchInfo.endAddr;
+            sz += matchInfo.sz;
         }
 
         bool isMergable(const MatchInfo& matchInfo) const
@@ -40,10 +44,20 @@ namespace pattern
             return matchImpl->equals(matchInfo.matchImpl);
         }
 
+        int size() const
+        {
+            return sz;
+        }
+
+        void setIndex(int index)
+        {
+            this->index = index;
+        }
+
         std::string str() const
         {
             std::ostringstream oss;
-            oss << matchImpl->str();
+            oss << matchImpl->str() << " size = " << sz;
             return oss.str();
         }
     };

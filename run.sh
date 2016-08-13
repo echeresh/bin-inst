@@ -18,6 +18,8 @@ g++ -o build/test.out test/test.cpp -std=c++11 -fopenmp -gdwarf-2 -O0
 
 set +e
 
+mkdir -p bin
+
 if [ -n "$debug" ]; then
 ${PIN_ROOT}/intel64/bin/pinbin -pause_tool 10 -t build/tool/tool.so -- $exe_cmd
 else

@@ -17,7 +17,7 @@ namespace dwarf
 
     public:
         DwarfParser(const std::string& filePath);
-        size_t getSize(Dwarf_Die die, const WalkInfo& walkInfo);
+        size_t getSize(Dwarf_Die die, const WalkInfo& walkInfo, size_t* pTypeSize);
         void walkTree(Dwarf_Die die, WalkInfo& walkInfo);
         void walk(Dwarf_Die cuDie, Dwarf_Unsigned off);
         void cuWalk(std::function<void(Dwarf_Die, Dwarf_Unsigned)> cuHandler);

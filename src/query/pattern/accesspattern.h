@@ -19,6 +19,7 @@ namespace pattern
         void mergeMatches();
 
     protected:
+        static int MIN_GROUP_SIZE;
         std::deque<Access> accesses;
 
     public:
@@ -27,8 +28,8 @@ namespace pattern
         Access pop_front();
         bool isFull() const;
         bool process(const Access& a);
-        std::vector<MatchInfo> getMatches() const;
+        std::vector<MatchInfo> getMatches();
         virtual MatchImpl* match() = 0;
         std::string str() const;
     };
-}
+} //namespace pattern

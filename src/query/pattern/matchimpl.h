@@ -1,12 +1,18 @@
 #pragma once
 #include <string>
 
+#include "patterntype.h"
+
 namespace pattern
 {
     class MatchImpl
     {
+    protected:
+        PatternType patternType;
+
     public:
-        virtual bool equals(const MatchImpl* matchImpl) const = 0;
+        MatchImpl(PatternType patternType);
+        virtual bool equals(const MatchImpl* matchImpl) const;
         virtual std::string str() const = 0;
     };
 }

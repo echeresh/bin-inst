@@ -36,12 +36,13 @@ namespace dwarf
         FuncInfo* parent;
         std::string name;
         size_t size;
+        size_t typeSize;
         LocInfo location;
         SourceLocation srcLoc;
 
         VarInfo() = default;
         VarInfo(int id, StorageType type, FuncInfo* parent, const std::string& name, size_t size,
-                const LocInfo& location, const SourceLocation& srcLoc);
+                size_t typeSize, const LocInfo& location, const SourceLocation& srcLoc);
     };
 
     class DwarfContext

@@ -1,4 +1,5 @@
 #include "statpattern.h"
+
 #include <algorithm>
 #include <cassert>
 #include <iomanip>
@@ -6,12 +7,15 @@
 #include <vector>
 #include <utility>
 
+#include "patterntype.h"
+
 namespace pattern
 {
     static const int WINDOW_SIZE = 3;
     static const size_t MAX_HALF_OFFSET = 1 << 7;
 
-    StatMatchImpl::StatMatchImpl(size_t hashCode) :
+    StatMatchImpl::StatMatchImpl(size_t hashCode):
+        MatchImpl(PatternType::Stat),
         hashCode(hashCode)
     {
     }

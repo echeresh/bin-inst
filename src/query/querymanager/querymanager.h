@@ -89,6 +89,12 @@ public:
                     auto& me = e.memoryEvent;
                     if (me.varId >= 0)
                     {
+                        if (varAnalyzers.find(me.varId) == varAnalyzers.end())
+                        {
+                            auto* varInfo = debugContext.findVarById(me.varId);
+                            assert(varInfo);
+                            varAnalyzers.insert(std::make_pair(me.varId, pattern::PatternAnalyzer(varInfo->typeSize)));
+                        }
                         varAnalyzers[me.varId].pushAccess(e.toAccess());
                     }
                 }

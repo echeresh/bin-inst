@@ -29,12 +29,15 @@ namespace pattern
             for (auto& e: matchInfos)
             {
                 auto* varInfo = debugContext.findVarById(e.first);
-                oss << "MatchInfo -- " << varInfo->name << ":" << std::endl;
-                for (auto& mi: e.second)
-                {
-                    oss << mi.str() << std::endl;
-                }
-                oss << std::endl;
+		if (!e.second.empty())
+		{
+                    oss << "MatchInfo -- " << varInfo->name << ":" << std::endl;
+                    for (auto& mi: e.second)
+                    {
+                        oss << mi.str() << std::endl;
+                    }
+                    oss << std::endl;
+		}
             }
             return oss.str();
         }

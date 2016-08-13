@@ -4,6 +4,8 @@
 
 namespace pattern
 {
+    int AccessPattern::MIN_GROUP_SIZE = 3;
+
     AccessPattern::AccessPattern(size_t windowSize) :
         windowSize(windowSize)
     {
@@ -30,7 +32,6 @@ namespace pattern
 
     bool AccessPattern::process(const Access& a)
     {
-        processed++;
         if (isFull())
         {
             pop_front();
@@ -39,6 +40,7 @@ namespace pattern
 
         if (!isFull())
         {
+            processed++;
             return false;
         }
 
@@ -48,9 +50,12 @@ namespace pattern
             matched++;
             auto& first = accesses.front();
             auto& last = accesses.back();
-            matches.push_back(MatchInfo(matchImpl, first.addr, last.addr));
+            MatchInfo mi(matchImpl, first.addr, last.addr);
+            mi.setIndex(processed);
+            matches.push_back(mi);
             mergeMatches();
         }
+        processed++;
         return matchImpl;
     }
 
@@ -68,10 +73,19 @@ namespace pattern
             prev.update(cur);
             matches.pop_back();
         }
+        else if (prev.size() < MIN_GROUP_SIZE)
+        {
+            matches.erase(matches.begin() + matches.size() - 1);
+        }
     }
 
-    std::vector<MatchInfo> AccessPattern::getMatches() const
+    std::vector<MatchInfo> AccessPattern::getMatches()
     {
+        //remove last machInfo if it has size < MIN_GROUP_SIZE
+        if (!matches.empty() && matches.back().size() < MIN_GROUP_SIZE)
+        {
+            matches.pop_back();
+        }
         return matches;
     }
 
@@ -81,4 +95,4 @@ namespace pattern
         oss << "[matched " << matched << "/" << processed << "]";
         return oss.str();
     }
-}
+} //namespace pattern

@@ -53,11 +53,11 @@ public:
         {
             reuse += reuseDiff[i];
         }
-        std::cout << reuse << " " << totalAccesses << std::endl;
+        //std::cout << reuse << " " << totalAccesses << std::endl;
         double value = reuseDiff[1] * log2(N);
         for (int i = 2; i < log2(N) + 1; i++)
         {
-            std::cout << "-> " << reuseDiff[i] << std::endl;
+            //std::cout << "-> " << reuseDiff[i] << std::endl;
             value += reuseDiff[i] * (log2(N) - i);
         }
         return value / log2(N) / totalAccesses;

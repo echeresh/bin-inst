@@ -17,12 +17,13 @@ namespace dbginfo
         StorageType type;
         std::string name;
         size_t size;
+        size_t typeSize; // if > 0 then the variable is array and typeSize is size of underlying type
         ssize_t stackOffset;
         SourceLocation srcLoc;
         const FuncInfo* parent = nullptr;
 
         VarInfo() = default;
-        VarInfo(StorageType type, const std::string& name, size_t size,
+        VarInfo(StorageType type, const std::string& name, size_t size, size_t typeSize,
                 ssize_t stackOffset, const SourceLocation& srcLoc, const FuncInfo* parent = nullptr);
 
         //declare compare operator for storing in set

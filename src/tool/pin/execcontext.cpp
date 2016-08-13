@@ -111,7 +111,8 @@ namespace pin
         std::cout << "alloc __dyn_#" + std::to_string(id) << " " << memoryEvent.addr << std::endl;
         auto* varInfo = dbgCtxt.addVar(dbginfo::VarInfo(dbginfo::StorageType::Dynamic,
                                                         "__dyn_" + std::to_string(id++),
-                                                        memoryEvent.size, (ssize_t)memoryEvent.addr, srcLoc));
+                                                        memoryEvent.size, memoryEvent.size,
+                                                        (ssize_t)memoryEvent.addr, srcLoc));
         memoryEvent.varId = varInfo->id;
         auto ret = objects.insert(MemoryObject(memoryEvent.addr, memoryEvent.size, varInfo));
         assert(ret.second);
@@ -232,11 +233,11 @@ namespace pin
         auto* func = dbgCtxt.findFuncByName(name);
         if (!func)
         {
-            cout << "--------> " << name << " -1" << endl;
+            //cout << "--------> " << name << " -1" << endl;
             return -1;
         }
         assert(func);
-        cout << "--------> " << name << " " << func->id << endl;
+        //cout << "--------> " << name << " " << func->id << endl;
         return func->id;
     }
 
@@ -294,7 +295,7 @@ namespace pin
             processed++;
             if (processed % 10000 == 0)
             {
-                std::cout << "completed: " << processed * 100. / em.size() << "%" << " " << em.size() << std::endl;
+                std::cout << "Event postprocessing: " << processed * 100. / em.size() << "%" << " " << em.size() << std::endl;
             }
 
             Event& e = em.next();

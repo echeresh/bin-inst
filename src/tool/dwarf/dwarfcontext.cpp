@@ -24,16 +24,17 @@ namespace dwarf
     //------------------------------------------------------------------------------
 
     VarInfo::VarInfo(int id, StorageType type, FuncInfo* parent, const std::string& name, size_t size,
-                     const LocInfo& location, const SourceLocation& srcLoc) :
+                     size_t typeSize, const LocInfo& location, const SourceLocation& srcLoc) :
         id(id),
         type(type),
         parent(parent),
         name(name),
         size(size),
+        typeSize(typeSize),
         location(location),
         srcLoc(srcLoc)
     {
-        dwarfLog << "VarInfo: " << name << " " << size << std::endl;
+        dwarfLog << "VarInfo: " << name << " " << size << " " << typeSize << std::endl;
     }
 
     //------------------------------------------------------------------------------
@@ -130,7 +131,7 @@ namespace dwarf
                 {
                     continue;
                 }
-                dbginfo::VarInfo var(type, v.name, v.size, entry.off, v.srcLoc, pFuncInfo);
+                dbginfo::VarInfo var(type, v.name, v.size, v.typeSize, entry.off, v.srcLoc, pFuncInfo);
                 ctxt.addVar(var);
             }
         }
@@ -147,7 +148,8 @@ namespace dwarf
                     continue;
                 }
                 auto& entry = entries.front();
-                dbginfo::VarInfo var(dbginfo::StorageType::Static, v.name, v.size, entry.off, v.srcLoc);
+                dbginfo::VarInfo var(dbginfo::StorageType::Static, v.name, v.size,
+                                     v.typeSize, entry.off, v.srcLoc);
                 ctxt.addVar(var);
             }
         }

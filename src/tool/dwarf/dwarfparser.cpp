@@ -32,8 +32,12 @@ namespace dwarf
         DWARF_CHECK(dwarf_init(fd, access, nullptr, nullptr, &dbg, nullptr));
     }
 
-    size_t DwarfParser::getSize(Dwarf_Die die, const WalkInfo& walkInfo)
+    size_t DwarfParser::getSize(Dwarf_Die die, const WalkInfo& walkInfo, size_t* pTypeSize)
     {
+        if (pTypeSize)
+        {
+            *pTypeSize = 0;
+        }
         const size_t PtrSize = 8;
         Dwarf_Attribute attr = getAttr(die, DW_AT_type);
         if (!attr)
@@ -55,7 +59,7 @@ namespace dwarf
         if (tag == DW_TAG_typedef || tag == DW_TAG_const_type ||
             tag == DW_TAG_volatile_type || tag == DW_TAG_restrict_type ||
             tag == DW_TAG_mutable_type)
-            return getSize(typeDie, walkInfo);
+            return getSize(typeDie, walkInfo, nullptr);
 
         Dwarf_Bool hasSize;
         switch (tag)
@@ -111,7 +115,12 @@ namespace dwarf
                     elemCount *= upperBound;
                 }
             }
-            return elemCount*getSize(typeDie, walkInfo);
+            size_t typeSize = getSize(typeDie, walkInfo, nullptr);
+            if (pTypeSize)
+            {
+                *pTypeSize = typeSize;
+            }
+            return elemCount * typeSize;
         }
         case DW_TAG_base_type:
         case DW_TAG_enumeration_type:
@@ -154,7 +163,12 @@ namespace dwarf
                 DWARF_CHECK(dwarf_tag(walkInfo.parentDie, &parentTag, nullptr));
                 DWARF_CHECK(dwarf_get_TAG_name(parentTag, &parentTagName));
             }
-            size_t size = getSize(die, walkInfo);
+            size_t typeSize;
+            size_t size = getSize(die, walkInfo, &typeSize);
+            if (typeSize == 0)
+            {
+                typeSize = size;
+            }
             //dwarfLog << "size = " << size << endl;
             if (size != 0)
             {
@@ -167,7 +181,8 @@ namespace dwarf
                     Dwarf_Off id;
                     DWARF_CHECK(dwarf_dieoffset(die, &id, nullptr));
                     dctx.addVar(VarInfo(id, StorageType::Static, nullptr, getDieName(die),
-                                        size, LocInfo(dbg, die), SourceLocation(walkInfo.cuName, declLine)));
+                                        size, typeSize,
+                                        LocInfo(dbg, die), SourceLocation(walkInfo.cuName, declLine)));
                 }
                 else
                 {
@@ -177,7 +192,8 @@ namespace dwarf
                     auto* func = dctx.getFunc(id);
                     DWARF_CHECK(dwarf_dieoffset(die, &id, nullptr));
                     dctx.addVar(VarInfo(id, StorageType::Auto, func, getDieName(die),
-                                        size, LocInfo(dbg, die), SourceLocation(walkInfo.cuName, declLine)));
+                                        size, typeSize,
+                                        LocInfo(dbg, die), SourceLocation(walkInfo.cuName, declLine)));
                 }
             }
         }
@@ -198,13 +214,13 @@ namespace dwarf
                 attr = getAttr(die, DW_AT_MIPS_linkage_name);
 
             string name = getDieName(die);
-            std::cout << name << std::endl;
+            //std::cout << name << std::endl;
             string linkageName;
             if (attr)
             {
                 Dwarf_Half retForm;
                 dwarf_whatform(attr, &retForm, nullptr);
-                std::cout << retForm << std::endl;
+                //std::cout << retForm << std::endl;
                 assert(retForm == DW_FORM_strp || retForm == DW_FORM_string);
                 char* linkageNamePtr = nullptr;
                 dwarf_formstring(attr, &linkageNamePtr, NULL);

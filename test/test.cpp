@@ -80,7 +80,7 @@ void test(Func func, int n, double a[], double b[], double c[])
 {
     double t0 = dsecnd();
     func(n, a, b, c);
-    cout << "time: " << dsecnd() - t0 << endl;
+    cout << "Matrix multiplication time: " << dsecnd() - t0 << endl;
 
     double err = 0;
     for (int i = 0; i < n; i++)
@@ -89,11 +89,10 @@ void test(Func func, int n, double a[], double b[], double c[])
             double v = 0;
             for (int k = 0; k < n; k++)
                 v += a[i*n + k]*b[k*n + j];
-            err = v - c[i*n + j];
-            //err = max(err, abs(v - c[i*n + j]));
+            err = max(err, abs(v - c[i*n + j]));
         }
 
-    cout << "error: " << err << endl;
+    cout << "Matrix multiplication error: " << err << endl;
     cout << endl;
 }
 
@@ -107,17 +106,14 @@ int main(int argc, char** argv)
     double a[N*N];
     double b[N*N];
     double c[N*N] = { 0 };
-    //double* a = (double*)malloc(sizeof(double)*n*n);
-    //double* b = (double*)malloc(sizeof(double)*n*n);
-    //double* c = (double*)malloc(n*n*sizeof(double));
     for (int i = 0; i < n; i++)
+    {
         for (int j = 0; j < n; j++)
         {
             a[i*n + j] = drand();
             b[i*n + j] = drand();
         }
-    //test(*mfuncs[mix], n, a, b, c);
-    mul0(n, a, b, c);
-    //mul1(n, a, b, c);
+    }
+    test(*mfuncs[mix], n, a, b, c);
     return 0;
 }

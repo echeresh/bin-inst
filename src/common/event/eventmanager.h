@@ -20,7 +20,8 @@ class EventManager
     std::vector<Event> preloadEvents;
 
 public:
-    EventManager(const dbginfo::DebugContext& dbgContext, const std::string& eventPath = std::string(), int totalEvents = 0):
+    EventManager(const dbginfo::DebugContext& dbgContext, const std::string& eventPath = std::string(),
+                 int totalEvents = 0):
         callStackGlobal(MAX_THREADS),
         dbgContext(dbgContext),
         eventPath(eventPath),

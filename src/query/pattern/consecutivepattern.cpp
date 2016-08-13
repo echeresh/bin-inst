@@ -4,36 +4,21 @@
 
 namespace pattern
 {
-    ConsecutiveMatchImpl::ConsecutiveMatchImpl(size_t stride) :
-        stride(stride)
+    ConsecutiveMatchImpl::ConsecutiveMatchImpl(size_t typeSize):
+        typeSize(typeSize),
+        MatchImpl(PatternType::Consecutive)
     {
-    }
-
-    bool ConsecutiveMatchImpl::equals(const MatchImpl* matchImpl) const
-    {
-        auto* consecutiveMatchImpl = (ConsecutiveMatchImpl*)matchImpl;
-        return stride == consecutiveMatchImpl->stride;
-
     }
 
     std::string ConsecutiveMatchImpl::str() const
     {
-        return "[ConsecutiveMatchImpl stride:" + std::to_string((long long)stride) + "]";
+        return "[ConsecutiveMatchImpl: typeSize = " + std::to_string((long long)typeSize) + "]";
     }
 
-
-    MatchImpl* ConsecutivePattern::getMatchImpl(size_t stride)
-    {
-        auto it = matchesPool.find(stride);
-        if (it == matchesPool.end())
-        {
-            matchesPool[stride] = std::unique_ptr<ConsecutiveMatchImpl>(new ConsecutiveMatchImpl(stride));
-        }
-        return matchesPool[stride].get();
-    }
-
-    ConsecutivePattern::ConsecutivePattern() :
-        AccessPattern(WINDOW_SIZE)
+    ConsecutivePattern::ConsecutivePattern(size_t typeSize):
+        AccessPattern(WINDOW_SIZE),
+        typeSize(typeSize),
+        matchImpl(new ConsecutiveMatchImpl(typeSize))
     {
     }
 
@@ -42,9 +27,17 @@ namespace pattern
         assert(isFull());
         auto a0 = accesses[0];
         auto a1 = accesses[1];
-        if (a0.accessType == a1.accessType)
+#if 0
+        std::cout << "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" << std::endl;
+        std::cout << (void*)a0.addr << std::endl;
+        std::cout << (void*)a1.addr << std::endl;
+        std::cout << (size_t)(a1.addr - a0.addr) << std::endl;
+        std::cout << typeSize << std::endl;
+        std::cout << "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" << std::endl;
+#endif
+        if (a0.accessType == a1.accessType && a1.addr - a0.addr == typeSize)
         {
-            return getMatchImpl(a1.addr - a0.addr);
+            return matchImpl.get();
         }
         return nullptr;
     }
