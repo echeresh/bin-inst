@@ -3,6 +3,8 @@
 #include "config.h"
 using namespace std;
 
+static std::string TEST_BIN_PATH = "a.out";
+
 int main()
 {
     const char* binPath = TEST_BIN_PATH;
