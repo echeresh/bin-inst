@@ -1,5 +1,8 @@
 #!/bin/bash
 
+base="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd ${base}
+
 if [ -z "$PIN_ROOT" ]; then
     source tools/setup.sh
 fi
